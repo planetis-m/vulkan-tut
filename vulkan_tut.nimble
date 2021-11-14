@@ -6,4 +6,4 @@ license       = "Public Domain"
 
 # Dependencies
 requires "nim >= 1.6.0"
-requires "vulkanim"
+requires "https://github.com/Clyybber/vulkanim.git"
