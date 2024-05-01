@@ -1,10 +1,9 @@
 # Package
 version       = "0.1.0"
 author        = "Antonis Geralis"
-description   = "Vulkan tutorial"
+description   = "Vulkan compute example"
 license       = "Public Domain"
 
 # Dependencies
-requires "nim >= 1.6.0"
-requires "sdl2"
-requires "https://github.com/Clyybber/vulkanim.git"
+requires "nim >= 2.1.0"
+requires "https://github.com/planetis-m/vulkan.git"
