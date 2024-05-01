@@ -2,7 +2,7 @@ import opengl, opengl/glut
 
 proc main =
   # Create an OpenGL context and window
-  var argc: cint = 0
+  var argc: int32 = 0
   glutInit(addr argc, nil)
   glutInitDisplayMode(GLUT_DOUBLE)
   glutInitWindowSize(640, 480)
@@ -38,7 +38,7 @@ proc main =
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
 
   # Load the compute shader
-  let shaderCode = readFile("shaders/shader.comp")
+  let shaderCode = readFile("shaders/square.comp")
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
   var shaderCodeCStr = allocCStringArray([shaderCode])
   glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
@@ -51,11 +51,6 @@ proc main =
 
   # Bind the shader storage buffers
   glUseProgram(shaderProgram)
-  let inBufferIndex = glGetProgramResourceIndex(shaderProgram, GL_SHADER_STORAGE_BLOCK, "lay0")
-  let outBufferIndex = glGetProgramResourceIndex(shaderProgram, GL_SHADER_STORAGE_BLOCK, "lay1")
-
-  glShaderStorageBlockBinding(shaderProgram, inBufferIndex, 0)
-  glShaderStorageBlockBinding(shaderProgram, outBufferIndex, 1)
 
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outBuffer)
