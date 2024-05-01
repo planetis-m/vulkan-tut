@@ -165,7 +165,7 @@ proc main =
   # Bind the memory to the output buffer at the aligned offset
   doAssert vkBindBufferMemory(device, outBuffer, bufferMemory, alignedSize) == VkSuccess
 
-  let shaderCode = readFile("shaders/shader.spv")
+  let shaderCode = readFile("build/shaders/square.spv")
   # Create a VkShaderModuleCreateInfo struct
   let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
     codeSize = shaderCode.len.uint,
