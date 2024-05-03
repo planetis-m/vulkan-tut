@@ -6,6 +6,38 @@ template toCStringArray(arr: openarray[cstring]): untyped = cast[cstringArray](a
 proc alignUp(value, alignment: VkDeviceSize): VkDeviceSize {.inline.} =
   VkDeviceSize((value.uint64 + alignment.uint64 - 1) and not (alignment.uint64 - 1))
 
+proc vkGetBestComputeQueueNPH(physicalDevice: VkPhysicalDevice, queueFamilyIndex: var uint32): VkResult =
+  # Find a compute queue family
+  var queueFamilyCount: uint32 = 0
+  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, nil)
+
+  var queueFamilyProps = newSeq[VkQueueFamilyProperties](queueFamilyCount)
+  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, queueFamilyProps[0].addr)
+
+  for i in 0 ..< queueFamilyProps.len:
+    let prop = queueFamilyProps[i]
+    if (prop.queueFlags.uint32 and VkQueueFlagBits.ComputeBit.uint32) != 0:
+      queueFamilyIndex = i.uint32
+      return VkSuccess
+
+  result = VkErrorInitializationFailed
+
+proc vkGetBestMemoryTypeNPH(physicalDevice: VkPhysicalDevice, memTypeIndex: var uint32,
+    memHeapSize: var VkDeviceSize): VkResult =
+  # query
+  var memProperties: VkPhysicalDeviceMemoryProperties
+  vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties.addr)
+
+  let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32)
+  for i in 0 ..< memProperties.memoryTypeCount.int:
+    let memoryType = memProperties.memoryTypes[i]
+    if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32:
+      memHeapSize = memProperties.memoryHeaps[memoryType.heapIndex].size
+      memTypeIndex = i.uint32
+      return VkSuccess
+
+  result = VkErrorInitializationFailed
+
 proc main =
   vkPreload()
 
@@ -56,23 +88,8 @@ proc main =
   echo "API version: ", vkVersionMajor(deviceProperties.apiVersion), ".", vkVersionMinor(deviceProperties.apiVersion), ".", vkVersionPatch(deviceProperties.apiVersion)
   echo "Max compute shared memory size: ", formatSize(deviceProperties.limits.maxComputeSharedMemorySize.int64)
 
-  # Find a compute queue family
-  var queueFamilyCount: uint32 = 0
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, nil)
-
-  var queueFamilyProps = newSeq[VkQueueFamilyProperties](queueFamilyCount)
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, queueFamilyProps[0].addr)
-
-  var queueIndex = -1
-  for i in 0 ..< queueFamilyProps.len:
-    let prop = queueFamilyProps[i]
-    if (prop.queueFlags.uint32 and VkQueueFlagBits.ComputeBit.uint32) != 0:
-      queueIndex = i
-      break
-
-  doAssert queueIndex != -1
-
-  var computeQueueFamilyIndex = queueIndex.uint32
+  var computeQueueFamilyIndex: uint32 = 0
+  doAssert vkGetBestComputeQueueNPH(physicalDevice, computeQueueFamilyIndex) == VkSuccess
   echo "Compute Queue Family Index: ", computeQueueFamilyIndex
 
   let queuePriority = 1'f32
@@ -118,20 +135,9 @@ proc main =
   var outMemRequirements: VkMemoryRequirements
   vkGetBufferMemoryRequirements(device, inBuffer, outMemRequirements.addr)
 
-  # query
-  var memProperties: VkPhysicalDeviceMemoryProperties
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties.addr)
-
-  var memTypeIndex = -1
+  var memTypeIndex: uint32 = 0
   var memHeapSize = 0.VkDeviceSize
-  let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32)
-
-  for i in 0 ..< memProperties.memoryTypeCount.int:
-    let memoryType = memProperties.memoryTypes[i]
-    if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32:
-      memHeapSize = memProperties.memoryHeaps[memoryType.heapIndex].size
-      memTypeIndex = i
-      break
+  doAssert vkGetBestMemoryTypeNPH(physicalDevice, memTypeIndex, memHeapSize) == VkSuccess
 
   echo "Memory Type Index: ", memTypeIndex
   echo "Memory Heap Size : ", formatSize(memHeapSize.int64)
@@ -143,7 +149,7 @@ proc main =
   # Allocate memory for both buffers
   var memAllocateInfo = newVkMemoryAllocateInfo(
     allocationSize = combinedSize,
-    memoryTypeIndex = memTypeIndex.uint32
+    memoryTypeIndex = memTypeIndex
   )
 
   var bufferMemory: VkDeviceMemory
