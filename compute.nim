@@ -28,7 +28,7 @@ proc vkGetBestMemoryTypeNPH(physicalDevice: VkPhysicalDevice, memTypeIndex: var 
   var memProperties: VkPhysicalDeviceMemoryProperties
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties.addr)
 
-  let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32)
+  let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32 or HostCachedBit.uint32)
   for i in 0 ..< memProperties.memoryTypeCount.int:
     let memoryType = memProperties.memoryTypes[i]
     if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32:
@@ -114,7 +114,7 @@ proc main =
   doAssert vkCreateDevice(physicalDevice, deviceCreateInfo.addr, nil, device.addr) == VkSuccess
 
   # Create buffers
-  const NumElements = 10
+  const NumElements = 16384
   const BufferSize = NumElements*sizeof(int32)
 
   let bufferCreateInfo = newVkBufferCreateInfo(
@@ -135,16 +135,16 @@ proc main =
   var outMemRequirements: VkMemoryRequirements
   vkGetBufferMemoryRequirements(device, inBuffer, outMemRequirements.addr)
 
-  var memTypeIndex: uint32 = 0
+  # Determine the size and alignment for the combined memory
+  let alignedSize = alignUp(inMemRequirements.size, outMemRequirements.alignment)
+  let combinedSize = VkDeviceSize(alignedSize.uint64 + outMemRequirements.size.uint64)
+
+  var memTypeIndex: uint32 = VK_MAX_MEMORY_TYPES
   var memHeapSize = 0.VkDeviceSize
   doAssert vkGetBestMemoryTypeNPH(physicalDevice, memTypeIndex, memHeapSize) == VkSuccess
 
   echo "Memory Type Index: ", memTypeIndex
   echo "Memory Heap Size : ", formatSize(memHeapSize.int64)
-
-  # Determine the size and alignment for the combined memory
-  let alignedSize = alignUp(inMemRequirements.size, outMemRequirements.alignment)
-  let combinedSize = VkDeviceSize(alignedSize.uint64 + outMemRequirements.size.uint64)
 
   # Allocate memory for both buffers
   var memAllocateInfo = newVkMemoryAllocateInfo(
@@ -378,7 +378,7 @@ proc main =
   let t2 = cpuTime()
   # echo "OUTPUT: ", outBufferPtr[]
   for i in 0 ..< NumElements:
-    doAssert outBufferPtr[i] == int32(i)*int32(i)
+    doAssert outBufferPtr[i] == int32(i)
   let t3 = cpuTime()
   vkUnmapMemory(device, bufferMemory)
 
