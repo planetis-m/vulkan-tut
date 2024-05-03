@@ -6,36 +6,30 @@ template toCStringArray(arr: openarray[cstring]): untyped = cast[cstringArray](a
 proc alignUp(value, alignment: VkDeviceSize): VkDeviceSize {.inline.} =
   VkDeviceSize((value.uint64 + alignment.uint64 - 1) and not (alignment.uint64 - 1))
 
-proc vkGetBestComputeQueueNPH(physicalDevice: VkPhysicalDevice, queueFamilyIndex: var uint32): VkResult =
+proc vkGetBestComputeQueue(physicalDevice: VkPhysicalDevice, queueFamilyIndex: out uint32): VkResult =
   # Find a compute queue family
   var queueFamilyCount: uint32 = 0
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, nil)
-
   var queueFamilyProps = newSeq[VkQueueFamilyProperties](queueFamilyCount)
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, queueFamilyProps[0].addr)
-
   for i in 0 ..< queueFamilyProps.len:
     let prop = queueFamilyProps[i]
     if (prop.queueFlags.uint32 and VkQueueFlagBits.ComputeBit.uint32) != 0:
       queueFamilyIndex = i.uint32
       return VkSuccess
-
   result = VkErrorInitializationFailed
 
-proc vkGetBestMemoryTypeNPH(physicalDevice: VkPhysicalDevice, memTypeIndex: var uint32,
-    memHeapSize: var VkDeviceSize): VkResult =
-  # query
+proc vkFindSuitableMemoryType(physicalDevice: VkPhysicalDevice, memTypeIndex: out uint32,
+    memorySize: VkDeviceSize): VkResult =
   var memProperties: VkPhysicalDeviceMemoryProperties
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties.addr)
-
   let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32 or HostCachedBit.uint32)
   for i in 0 ..< memProperties.memoryTypeCount.int:
     let memoryType = memProperties.memoryTypes[i]
-    if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32:
-      memHeapSize = memProperties.memoryHeaps[memoryType.heapIndex].size
+    if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32 and
+        memorySize.uint64 < memProperties.memoryHeaps[memoryType.heapIndex].size.uint64:
       memTypeIndex = i.uint32
       return VkSuccess
-
   result = VkErrorInitializationFailed
 
 proc main =
@@ -89,7 +83,7 @@ proc main =
   echo "Max compute shared memory size: ", formatSize(deviceProperties.limits.maxComputeSharedMemorySize.int64)
 
   var computeQueueFamilyIndex: uint32 = 0
-  doAssert vkGetBestComputeQueueNPH(physicalDevice, computeQueueFamilyIndex) == VkSuccess
+  doAssert vkGetBestComputeQueue(physicalDevice, computeQueueFamilyIndex) == VkSuccess
   echo "Compute Queue Family Index: ", computeQueueFamilyIndex
 
   let queuePriority = 1'f32
@@ -140,11 +134,9 @@ proc main =
   let combinedSize = VkDeviceSize(alignedSize.uint64 + outMemRequirements.size.uint64)
 
   var memTypeIndex: uint32 = VK_MAX_MEMORY_TYPES
-  var memHeapSize = 0.VkDeviceSize
-  doAssert vkGetBestMemoryTypeNPH(physicalDevice, memTypeIndex, memHeapSize) == VkSuccess
+  doAssert vkFindSuitableMemoryType(physicalDevice, memTypeIndex, combinedSize) == VkSuccess
 
   echo "Memory Type Index: ", memTypeIndex
-  echo "Memory Heap Size : ", formatSize(memHeapSize.int64)
 
   # Allocate memory for both buffers
   var memAllocateInfo = newVkMemoryAllocateInfo(
