@@ -6,7 +6,7 @@ license       = "Public Domain"
 
 # Dependencies
 requires "nim >= 2.1.0"
-requires "https://github.com/planetis-m/vulkan.git"
+requires "https://github.com/planetis-m/vulkan.git >= 1.3.279"
 
 import std/os
 

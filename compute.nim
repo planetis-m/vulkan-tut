@@ -1,7 +1,7 @@
-import vulkan, std/strutils
+import vulkan, std/[strutils, times]
 
-template toCString(arr: array): untyped = cast[cstring](addr arr)
-template toCStringArray(arr: array): untyped = cast[cstringArray](addr arr)
+template toCString(arr: openarray[char]): untyped = cast[cstring](addr arr)
+template toCStringArray(arr: openarray[cstring]): untyped = cast[cstringArray](addr arr)
 
 proc alignUp(value, alignment: VkDeviceSize): VkDeviceSize {.inline.} =
   VkDeviceSize((value.uint64 + alignment.uint64 - 1) and not (alignment.uint64 - 1))
@@ -358,21 +358,28 @@ proc main =
 
   var fence: VkFence
   doAssert vkCreateFence(device, fenceCreateInfo.addr, nil, fence.addr) == VkSuccess
-
+  let t0 = cpuTime()
   # Submit the command buffer
   doAssert vkQueueSubmit(computeQueue, 1, submitInfo.addr, fence) == VkSuccess
 
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
   doAssert vkWaitForFences(device, 1, fence.addr, true.VkBool32, high(uint64)) == VkSuccess
-
+  let t1 = cpuTime()
   # Map the output buffer to read the results
   var outBufferPtr: ptr array[NumElements, int32] = nil
   doAssert vkMapMemory(device, bufferMemory, alignedSize, BufferSize.VkDeviceSize,
       0.VkMemoryMapFlags, cast[ptr pointer](outBufferPtr.addr)) == VkSuccess
-
-  echo "OUTPUT: ", outBufferPtr[]
-
+  let t2 = cpuTime()
+  # echo "OUTPUT: ", outBufferPtr[]
+  for i in 0 ..< NumElements:
+    doAssert outBufferPtr[i] == int32(i)*int32(i)
+  let t3 = cpuTime()
   vkUnmapMemory(device, bufferMemory)
+
+  template ff(f: float, prec: int = 4): string =
+   formatFloat(f * 1000, ffDecimal, prec) # ms
+
+  echo ("Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2))
 
   # Clean up
   vkDestroyFence(device, fence, nil)
