@@ -89,11 +89,11 @@ proc createInstance(x: var MandelbrotGenerator) =
   )
   when defined(vkDebug):
     var layerCount: uint32 = 0
-    discard vkEnumerateInstanceLayerProperties(x.instance, layerCount.addr, nil)
+    discard vkEnumerateInstanceLayerProperties(layerCount.addr, nil)
     var layerProperties = newSeq[VkLayerProperties](layerCount)
-    discard vkEnumerateInstanceLayerProperties(x.instance, layerCount.addr, layers[0].addr)
+    discard vkEnumerateInstanceLayerProperties(layerCount.addr, layerProperties[0].addr)
     let foundValidationLayer = layerProperties.anyIt(
-        "VK_LAYER_KHRONOS_validation" == cstring(it.layerName.addr))
+        "VK_LAYER_KHRONOS_validation" == cast[cstring](it.layerName.addr))
     assert foundValidationLayer, "Validation layer required, but not available"
   # Create a Vulkan instance
   let layers = getLayers()
