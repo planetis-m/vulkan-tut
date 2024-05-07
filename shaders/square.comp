@@ -12,5 +12,5 @@ layout(std430, binding = 1) buffer lay1 {
 void main() {
   // Current offset
   const uint id = gl_GlobalInvocationID.x;
-  outbuf[id] = inbuf[id];
+  outbuf[id] = inbuf[id] * inbuf[id];
 }

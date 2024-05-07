@@ -21,13 +21,14 @@ proc vkGetBestComputeQueue(physicalDevice: VkPhysicalDevice, queueFamilyIndex: o
 
 proc vkFindSuitableMemoryType(physicalDevice: VkPhysicalDevice, memTypeIndex: out uint32,
     memorySize: VkDeviceSize): VkResult =
+  # Find a suitable memory type for a Vulkan physical device
   var memProperties: VkPhysicalDeviceMemoryProperties
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties.addr)
   let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32 or HostCachedBit.uint32)
   for i in 0 ..< memProperties.memoryTypeCount.int:
     let memoryType = memProperties.memoryTypes[i]
     if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32 and
-        memorySize.uint64 < memProperties.memoryHeaps[memoryType.heapIndex].size.uint64:
+        memorySize.uint64 <= memProperties.memoryHeaps[memoryType.heapIndex].size.uint64:
       memTypeIndex = i.uint32
       return VkSuccess
   result = VkErrorInitializationFailed
@@ -108,7 +109,7 @@ proc main =
   doAssert vkCreateDevice(physicalDevice, deviceCreateInfo.addr, nil, device.addr) == VkSuccess
 
   # Create buffers
-  const NumElements = 16384
+  const NumElements = 128
   const BufferSize = NumElements*sizeof(int32)
 
   let bufferCreateInfo = newVkBufferCreateInfo(
@@ -370,12 +371,12 @@ proc main =
   let t2 = cpuTime()
   # echo "OUTPUT: ", outBufferPtr[]
   for i in 0 ..< NumElements:
-    doAssert outBufferPtr[i] == int32(i)
+    doAssert outBufferPtr[i] == int32(i)*int32(i)
   let t3 = cpuTime()
   vkUnmapMemory(device, bufferMemory)
 
   template ff(f: float, prec: int = 4): string =
-   formatFloat(f * 1000, ffDecimal, prec) # ms
+   formatFloat(f*1000, ffDecimal, prec) # ms
 
   echo ("Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2))
 
