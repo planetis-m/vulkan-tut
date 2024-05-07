@@ -101,9 +101,9 @@ proc createInstance(x: var MandelbrotGenerator) =
   let instanceCreateInfo = VkInstanceCreateInfo(
     pApplicationInfo: applicationInfo.addr,
     enabledLayerCount: uint32(layers.len),
-    ppEnabledLayerNames: cast[cstringArray](layers[0].addr),
+    ppEnabledLayerNames: if layers.len == 0: nil else: cast[cstringArray](layers[0].addr),
     enabledExtensionCount: uint32(extensions.len),
-    ppEnabledExtensionNames: cast[cstringArray](extensions[0].addr)
+    ppEnabledExtensionNames: if extensions.len == 0: nil else: cast[cstringArray](extensions[0].addr)
   )
   checkVkResult vkCreateInstance(instanceCreateInfo.addr, nil, x.instance.addr)
 
@@ -144,7 +144,7 @@ proc createDevice(x: var MandelbrotGenerator) =
     queueCreateInfoCount: 1,
     pQueueCreateInfos: queueCreateInfo.addr,
     enabledLayerCount: uint32(layers.len),
-    ppEnabledLayerNames: cast[cstringArray](layers[0].addr),
+    ppEnabledLayerNames: if layers.len == 0: nil else: cast[cstringArray](layers[0].addr),
     pEnabledFeatures: physicalDeviceFeatures.addr
   )
   # Create a logical device
@@ -277,7 +277,7 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
   vkUpdateDescriptorSets(x.device, writeDescriptorSets.len.uint32, writeDescriptorSets[0].addr, 0, nil)
 
 proc createComputePipeline(x: var MandelbrotGenerator) =
-  let computeShaderCode = readFile("build/shaders/madlebrot.spv")
+  let computeShaderCode = readFile("build/shaders/mandelbrot.spv")
   let shaderModuleCreateInfo = VkShaderModuleCreateInfo(
     codeSize: computeShaderCode.len.uint,
     pCode: cast[ptr uint32](computeShaderCode[0].addr)
