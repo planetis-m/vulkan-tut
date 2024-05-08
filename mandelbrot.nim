@@ -55,7 +55,7 @@ proc newMandelbrotGenerator*(width, height: int32): MandelbrotGenerator =
   result = MandelbrotGenerator(
     width: width,
     height: height,
-    workgroupSize: WorkgroupSize(x: 8, y: 8)
+    workgroupSize: WorkgroupSize(x: 32, y: 32)
   )
 
 proc fetchRenderedImage(x: MandelbrotGenerator): seq[uint8] =
