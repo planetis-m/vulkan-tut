@@ -160,13 +160,15 @@ proc createDevice(x: var MandelbrotGenerator) =
   vkGetDeviceQueue(x.device, x.queueFamilyIndex, 0, x.queue.addr)
 
 proc findMemoryType(physicalDevice: VkPhysicalDevice, typeFilter: uint32,
-    properties: VkMemoryPropertyFlags): uint32 =
+    size: VkDeviceSize, properties: VkMemoryPropertyFlags): uint32 =
   # Find a suitable memory type for a Vulkan physical device
   var memoryProperties: VkPhysicalDeviceMemoryProperties
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, memoryProperties.addr)
   for i in 0 ..< memoryProperties.memoryTypeCount.int:
+    let memoryType = memoryProperties.memoryTypes[i]
     if (typeFilter and (1'u32 shl i.uint32)) != 0 and
-       (memoryProperties.memoryTypes[i].propertyFlags.uint32 and properties.uint32) == properties.uint32:
+        (memoryType.propertyFlags.uint32 and properties.uint32) == properties.uint32 and
+        size.uint64 <= memoryProperties.memoryHeaps[memoryType.heapIndex].size.uint64:
       return i.uint32
   assert false, "Failed to find suitable memory type"
 
@@ -187,7 +189,7 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
   # Allocate memory for the buffer
   let allocInfo = newVkMemoryAllocateInfo(
     allocationSize = bufferMemoryRequirements.size,
-    memoryTypeIndex = findMemoryType(x.physicalDevice, bufferMemoryRequirements.memoryTypeBits, properties)
+    memoryTypeIndex = findMemoryType(x.physicalDevice, bufferMemoryRequirements.memoryTypeBits, size, properties)
   )
   var bufferMemory: VkDeviceMemory
   checkVkResult vkAllocateMemory(x.device, allocInfo.addr, nil, bufferMemory.addr)
