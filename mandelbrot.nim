@@ -220,17 +220,19 @@ proc createBuffers(x: var MandelbrotGenerator) =
 proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
   # Define the descriptor set layout bindings
   let bindings = [
-    VkDescriptorSetLayoutBinding(
-      binding: 0,
-      descriptorType: VkDescriptorType.StorageBuffer,
-      descriptorCount: 1,
-      stageFlags: VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit)
+    newVkDescriptorSetLayoutBinding(
+      binding = 0,
+      descriptorType = VkDescriptorType.StorageBuffer,
+      descriptorCount = 1,
+      stageFlags = VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit),
+      pImmutableSamplers = nil
     ),
-    VkDescriptorSetLayoutBinding(
-      binding: 1,
-      descriptorType: VkDescriptorType.UniformBuffer,
-      descriptorCount: 1,
-      stageFlags: VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit)
+    newVkDescriptorSetLayoutBinding(
+      binding = 1,
+      descriptorType = VkDescriptorType.UniformBuffer,
+      descriptorCount = 1,
+      stageFlags = VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit),
+      pImmutableSamplers = nil
     )
   ]
   # Create a descriptor set layout
