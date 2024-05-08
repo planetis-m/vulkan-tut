@@ -1,7 +1,7 @@
 import vulkan, std/[strutils, times]
 
-template toCString(arr: openarray[char]): untyped = cast[cstring](addr arr)
-template toCStringArray(arr: openarray[cstring]): untyped = cast[cstringArray](addr arr)
+template toCString(arr: openarray[char]): untyped = cast[cstring](addr arr[0])
+template toCStringArray(arr: openarray[cstring]): untyped = cast[cstringArray](addr arr[0])
 
 proc alignUp(value, alignment: VkDeviceSize): VkDeviceSize {.inline.} =
   VkDeviceSize((value.uint64 + alignment.uint64 - 1) and not (alignment.uint64 - 1))

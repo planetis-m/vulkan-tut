@@ -3,50 +3,35 @@ import vulkan, std/[sequtils, math]
 
 type
   MandelbrotGenerator* = object
-    width*, height*: int32
-    workgroupSize*: WorkgroupSize
-    instance*: VkInstance
-    physicalDevice*: VkPhysicalDevice
-    device*: VkDevice
-    queue*: VkQueue
-    queueFamilyIndex*: uint32
-    storageBuffer*: VkBuffer
-    storageBufferMemory*: VkDeviceMemory
-    uniformBuffer*: VkBuffer
-    uniformBufferMemory*: VkDeviceMemory
-    descriptorSetLayout*: VkDescriptorSetLayout
-    descriptorPool*: VkDescriptorPool
-    descriptorSets*: seq[VkDescriptorSet]
-    pipelineLayout*: VkPipelineLayout
-    pipeline*: VkPipeline
-    commandPool*: VkCommandPool
-    commandBuffer*: VkCommandBuffer
+    width, height: int32
+    workgroupSize: WorkgroupSize
+    instance: VkInstance
+    physicalDevice: VkPhysicalDevice
+    device: VkDevice
+    queue: VkQueue
+    queueFamilyIndex: uint32
+    storageBuffer: VkBuffer
+    storageBufferMemory: VkDeviceMemory
+    uniformBuffer: VkBuffer
+    uniformBufferMemory: VkDeviceMemory
+    descriptorSetLayout: VkDescriptorSetLayout
+    descriptorPool: VkDescriptorPool
+    descriptorSets: seq[VkDescriptorSet]
+    pipelineLayout: VkPipelineLayout
+    pipeline: VkPipeline
+    commandPool: VkCommandPool
+    commandBuffer: VkCommandBuffer
     when defined(vkDebug):
-      debugUtilsMessenger*: VkDebugUtilsMessengerEXT
+      debugUtilsMessenger: VkDebugUtilsMessengerEXT
 
-  WorkgroupSize* = object
-    x*, y*: uint32
+  WorkgroupSize = object
+    x, y: uint32
 
 template checkVkResult(call: untyped) =
   when defined(danger):
     discard call
   else:
     assert call == VkSuccess
-
-proc `=destroy`*(x: MandelbrotGenerator) =
-  vkFreeMemory(x.device, x.uniformBufferMemory, nil)
-  vkDestroyBuffer(x.device, x.uniformBuffer, nil)
-  vkFreeMemory(x.device, x.storageBufferMemory, nil)
-  vkDestroyBuffer(x.device, x.storageBuffer, nil)
-  vkDestroyPipeline(x.device, x.pipeline, nil)
-  vkDestroyPipelineLayout(x.device, x.pipelineLayout, nil)
-  vkDestroyDescriptorPool(x.device, x.descriptorPool, nil)
-  vkDestroyDescriptorSetLayout(x.device, x.descriptorSetLayout, nil)
-  vkDestroyCommandPool(x.device, x.commandPool, nil)
-  vkDestroyDevice(x.device, nil)
-  when defined(vkDebug):
-    vkDestroyDebugUtilsMessengerEXT(x.instance, x.debugUtilsMessenger, nil)
-  vkDestroyInstance(x.instance, nil)
 
 proc newMandelbrotGenerator*(width, height: int32): MandelbrotGenerator =
   ## Create a generator with the width and the height of the image.
@@ -78,6 +63,9 @@ proc getExtensions(): seq[cstring] =
   when defined(vkDebug):
     result.add("VK_EXT_debug_utils")
 
+template toCStringArray(arr: openarray[cstring]): untyped =
+  if arr.len > 0: cast[cstringArray](addr arr[0]) else: nil
+
 proc createInstance(x: var MandelbrotGenerator) =
   # Create an ApplicationInfo struct
   let applicationInfo = VkApplicationInfo(
@@ -88,6 +76,7 @@ proc createInstance(x: var MandelbrotGenerator) =
     apiVersion: vkApiVersion1_1
   )
   when defined(vkDebug):
+    # Enable the Khronos validation layer
     var layerCount: uint32 = 0
     discard vkEnumerateInstanceLayerProperties(layerCount.addr, nil)
     var layerProperties = newSeq[VkLayerProperties](layerCount)
@@ -101,9 +90,9 @@ proc createInstance(x: var MandelbrotGenerator) =
   let instanceCreateInfo = VkInstanceCreateInfo(
     pApplicationInfo: applicationInfo.addr,
     enabledLayerCount: uint32(layers.len),
-    ppEnabledLayerNames: if layers.len == 0: nil else: cast[cstringArray](layers[0].addr),
+    ppEnabledLayerNames: layers.toCStringArray,
     enabledExtensionCount: uint32(extensions.len),
-    ppEnabledExtensionNames: if extensions.len == 0: nil else: cast[cstringArray](extensions[0].addr)
+    ppEnabledExtensionNames: extensions.toCStringArray
   )
   checkVkResult vkCreateInstance(instanceCreateInfo.addr, nil, x.instance.addr)
 
@@ -144,7 +133,7 @@ proc createDevice(x: var MandelbrotGenerator) =
     queueCreateInfoCount: 1,
     pQueueCreateInfos: queueCreateInfo.addr,
     enabledLayerCount: uint32(layers.len),
-    ppEnabledLayerNames: if layers.len == 0: nil else: cast[cstringArray](layers[0].addr),
+    ppEnabledLayerNames: layers.toCStringArray,
     pEnabledFeatures: physicalDeviceFeatures.addr
   )
   # Create a logical device
@@ -172,6 +161,7 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
   )
   var buffer: VkBuffer
   checkVkResult vkCreateBuffer(x.device, bufferCreateInfo.addr, nil, buffer.addr)
+  # Memory requirements
   var bufferMemoryRequirements: VkMemoryRequirements
   vkGetBufferMemoryRequirements(x.device, buffer, bufferMemoryRequirements.addr)
   # Allocate memory for the buffer
@@ -186,6 +176,7 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
   result = (buffer, bufferMemory)
 
 proc createBuffers(x: var MandelbrotGenerator) =
+  # Allocate memory for both buffers
   (x.storageBuffer, x.storageBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(float32)*4*x.width*x.height),
     VkBufferUsageFlags(StorageBufferBit),
@@ -196,6 +187,7 @@ proc createBuffers(x: var MandelbrotGenerator) =
     VkBufferUsageFlags(UniformBufferBit),
     VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32)
   )
+  # Map the memory and write to the uniform buffer
   var mappedMemory: pointer = nil
   checkVkResult vkMapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
       VkDeviceSize(sizeof(int32)*2), 0.VkMemoryMapFlags, mappedMemory.addr)
@@ -204,6 +196,7 @@ proc createBuffers(x: var MandelbrotGenerator) =
   vkUnmapMemory(x.device, x.uniformBufferMemory)
 
 proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
+  # Define the descriptor set layout bindings
   let bindings = [
     VkDescriptorSetLayoutBinding(
       binding: 0,
@@ -218,6 +211,7 @@ proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
       stageFlags: VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit)
     )
   ]
+  # Create a descriptor set layout
   let createInfo = VkDescriptorSetLayoutCreateInfo(
     bindingCount: bindings.len.uint32,
     pBindings: bindings[0].addr
@@ -226,6 +220,7 @@ proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
       nil, x.descriptorSetLayout.addr)
 
 proc createDescriptorSets(x: var MandelbrotGenerator) =
+  # Create a descriptor pool
   let descriptorPoolSizes = [
     VkDescriptorPoolSize(
       `type`: VkDescriptorType.StorageBuffer,
@@ -240,6 +235,7 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
     pPoolSizes: descriptorPoolSizes[0].addr
   )
   checkVkResult vkCreateDescriptorPool(x.device, descriptorPoolCreateInfo.addr, nil, x.descriptorPool.addr)
+  # Allocate a descriptor set
   let descriptorSetAllocateInfo = VkDescriptorSetAllocateInfo(
     descriptorPool: x.descriptorPool,
     descriptorSetCount: 1,
@@ -248,6 +244,7 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
   var descriptorSet: VkDescriptorSet
   checkVkResult vkAllocateDescriptorSets(x.device, descriptorSetAllocateInfo.addr, descriptorSet.addr)
   x.descriptorSets = @[descriptorSet]
+  # Update the descriptor set with the buffer information
   let descriptorStorageBufferInfo = VkDescriptorBufferInfo(
     buffer: x.storageBuffer,
     offset: 0.VkDeviceSize,
@@ -277,6 +274,7 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
   vkUpdateDescriptorSets(x.device, writeDescriptorSets.len.uint32, writeDescriptorSets[0].addr, 0, nil)
 
 proc createComputePipeline(x: var MandelbrotGenerator) =
+  # Create the shader module
   let computeShaderCode = readFile("build/shaders/mandelbrot.spv")
   let shaderModuleCreateInfo = VkShaderModuleCreateInfo(
     codeSize: computeShaderCode.len.uint,
@@ -308,11 +306,13 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
     pName: "main",
     pSpecializationInfo: specializationInfo.addr
   )
+  # Create a pipeline layout with the descriptor set layout
   let pipelineLayoutCreateInfo = VkPipelineLayoutCreateInfo(
     setLayoutCount: 1,
     pSetLayouts: x.descriptorSetLayout.addr
   )
   checkVkResult vkCreatePipelineLayout(x.device, pipelineLayoutCreateInfo.addr, nil, x.pipelineLayout.addr)
+  # Create the compute pipeline
   let computePipelineCreateInfo = VkComputePipelineCreateInfo(
     stage: shaderStageCreateInfo,
     layout: x.pipelineLayout
@@ -389,24 +389,43 @@ when defined(vkDebug):
     stderr.write("\n")
     return VkFalse
 
+proc cleanup(x: MandelbrotGenerator) =
+  # Clean up
+  vkFreeMemory(x.device, x.uniformBufferMemory, nil)
+  vkDestroyBuffer(x.device, x.uniformBuffer, nil)
+  vkFreeMemory(x.device, x.storageBufferMemory, nil)
+  vkDestroyBuffer(x.device, x.storageBuffer, nil)
+  vkDestroyPipeline(x.device, x.pipeline, nil)
+  vkDestroyPipelineLayout(x.device, x.pipelineLayout, nil)
+  vkDestroyDescriptorPool(x.device, x.descriptorPool, nil)
+  vkDestroyDescriptorSetLayout(x.device, x.descriptorSetLayout, nil)
+  vkDestroyCommandPool(x.device, x.commandPool, nil)
+  vkDestroyDevice(x.device, nil)
+  when defined(vkDebug):
+    vkDestroyDebugUtilsMessengerEXT(x.instance, x.debugUtilsMessenger, nil)
+  vkDestroyInstance(x.instance, nil)
+
 proc generate*(x: var MandelbrotGenerator): seq[uint8] =
   ## Return the raw data of a mandelbrot image.
-  vkPreload()
-  # Hardware Setup Stage
-  createInstance(x)
-  vkInit(x.instance, load1_2 = false, load1_3 = false)
-  when defined(vkDebug):
-    setupDebugUtilsMessenger(x)
-  findPhysicalDevice(x)
-  createDevice(x)
-  # Resource Setup Stage
-  createBuffers(x)
-  # Pipeline Setup Stage
-  createDescriptorSetLayout(x)
-  createDescriptorSets(x)
-  createComputePipeline(x)
-  # Command Execution Stage
-  createCommandBuffer(x)
-  submitCommandBuffer(x)
-  # Fetch data from VRAM to RAM.
-  result = fetchRenderedImage(x)
+  try:
+    vkPreload()
+    # Hardware Setup Stage
+    createInstance(x)
+    vkInit(x.instance, load1_2 = false, load1_3 = false)
+    when defined(vkDebug):
+      setupDebugUtilsMessenger(x)
+    findPhysicalDevice(x)
+    createDevice(x)
+    # Resource Setup Stage
+    createBuffers(x)
+    # Pipeline Setup Stage
+    createDescriptorSetLayout(x)
+    createDescriptorSets(x)
+    createComputePipeline(x)
+    # Command Execution Stage
+    createCommandBuffer(x)
+    submitCommandBuffer(x)
+    # Fetch data from VRAM to RAM.
+    result = fetchRenderedImage(x)
+  finally:
+    cleanup(x)
