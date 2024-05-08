@@ -180,7 +180,7 @@ proc createBuffers(x: var MandelbrotGenerator) =
   (x.storageBuffer, x.storageBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(float32)*4*x.width*x.height),
     VkBufferUsageFlags(StorageBufferBit),
-    VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32)
+    VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32 or HostCachedBit.uint32)
   )
   (x.uniformBuffer, x.uniformBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(int32)*2),
