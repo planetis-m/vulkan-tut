@@ -34,7 +34,7 @@ template checkVkResult(call: untyped) =
     {.line: instantiationInfo().}:
       assert call == VkSuccess
 
-proc `=destroy`*(x: MandelbrotGenerator) =
+proc cleanup(x: MandelbrotGenerator) =
   # Clean up
   vkFreeMemory(x.device, x.uniformBufferMemory, nil)
   vkDestroyBuffer(x.device, x.uniformBuffer, nil)
@@ -195,11 +195,11 @@ proc createBuffers(x: var MandelbrotGenerator) =
   # Allocate memory for both buffers
   (x.storageBuffer, x.storageBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(float32)*4*x.width*x.height),
-    VkBufferUsageFlags(StorageBufferBit),
+    VkBufferUsageFlags(VkBufferUsageFlagBits.StorageBufferBit),
     VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32))
   (x.uniformBuffer, x.uniformBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(int32)*2),
-    VkBufferUsageFlags(UniformBufferBit),
+    VkBufferUsageFlags(VkBufferUsageFlagBits.UniformBufferBit),
     VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32))
   # Map the memory and write to the uniform buffer
   var mappedMemory: pointer = nil
@@ -395,32 +395,34 @@ when defined(vkDebug):
     let messageTypeFlags = VkDebugUtilsMessageTypeFlagsEXT(
       GeneralBit.uint32 or
       VkDebugUtilsMessageTypeFlagBitsEXT.ValidationBit.uint32 or PerformanceBit.uint32)
-    let createInfo = VkDebugUtilsMessengerCreateInfoEXT(
-      # sType: DebugUtilsMessengerCreateInfoEXT,
-      messageSeverity: severityFlags,
-      messageType: messageTypeFlags,
-      pfnUserCallback: debugCallback)
+    let createInfo = newVkDebugUtilsMessengerCreateInfoEXT(
+      messageSeverity = severityFlags,
+      messageType = messageTypeFlags,
+      pfnUserCallback = debugCallback)
     checkVkResult vkCreateDebugUtilsMessengerEXT(x.instance, createInfo.addr, nil, x.debugUtilsMessenger.addr)
 
 proc generate*(x: var MandelbrotGenerator): seq[uint8] =
   ## Return the raw data of a mandelbrot image.
-  vkPreload()
-  # Hardware Setup Stage
-  createInstance(x)
-  vkInit(x.instance, load1_2 = false, load1_3 = false)
-  when defined(vkDebug):
-    loadVK_EXT_debug_utils()
-    setupDebugUtilsMessenger(x)
-  findPhysicalDevice(x)
-  createDevice(x)
-  # Resource Setup Stage
-  createBuffers(x)
-  # Pipeline Setup Stage
-  createDescriptorSetLayout(x)
-  createDescriptorSets(x)
-  createComputePipeline(x)
-  # Command Execution Stage
-  createCommandBuffer(x)
-  submitCommandBuffer(x)
-  # Fetch data from VRAM to RAM.
-  result = fetchRenderedImage(x)
+  try:
+    vkPreload()
+    # Hardware Setup Stage
+    createInstance(x)
+    vkInit(x.instance, load1_2 = false, load1_3 = false)
+    when defined(vkDebug):
+      loadVK_EXT_debug_utils()
+      setupDebugUtilsMessenger(x)
+    findPhysicalDevice(x)
+    createDevice(x)
+    # Resource Setup Stage
+    createBuffers(x)
+    # Pipeline Setup Stage
+    createDescriptorSetLayout(x)
+    createDescriptorSets(x)
+    createComputePipeline(x)
+    # Command Execution Stage
+    createCommandBuffer(x)
+    submitCommandBuffer(x)
+    # Fetch data from VRAM to RAM.
+    result = fetchRenderedImage(x)
+  finally:
+    cleanup(x)
