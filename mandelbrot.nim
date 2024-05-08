@@ -33,6 +33,22 @@ template checkVkResult(call: untyped) =
   else:
     assert call == VkSuccess
 
+proc `=destroy`*(x: MandelbrotGenerator) =
+  # Clean up
+  vkFreeMemory(x.device, x.uniformBufferMemory, nil)
+  vkDestroyBuffer(x.device, x.uniformBuffer, nil)
+  vkFreeMemory(x.device, x.storageBufferMemory, nil)
+  vkDestroyBuffer(x.device, x.storageBuffer, nil)
+  vkDestroyPipeline(x.device, x.pipeline, nil)
+  vkDestroyPipelineLayout(x.device, x.pipelineLayout, nil)
+  vkDestroyDescriptorPool(x.device, x.descriptorPool, nil)
+  vkDestroyDescriptorSetLayout(x.device, x.descriptorSetLayout, nil)
+  vkDestroyCommandPool(x.device, x.commandPool, nil)
+  vkDestroyDevice(x.device, nil)
+  when defined(vkDebug):
+    vkDestroyDebugUtilsMessengerEXT(x.instance, x.debugUtilsMessenger, nil)
+  vkDestroyInstance(x.instance, nil)
+
 proc newMandelbrotGenerator*(width, height: int32): MandelbrotGenerator =
   ## Create a generator with the width and the height of the image.
   result = MandelbrotGenerator(
@@ -63,8 +79,8 @@ proc getExtensions(): seq[cstring] =
   when defined(vkDebug):
     result.add("VK_EXT_debug_utils")
 
-template toCStringArray(arr: openarray[cstring]): untyped =
-  if arr.len > 0: cast[cstringArray](addr arr[0]) else: nil
+template toCStringArray(x: seq[cstring]): untyped =
+  if x.len > 0: cast[cstringArray](addr x[0]) else: nil
 
 proc createInstance(x: var MandelbrotGenerator) =
   # Create an ApplicationInfo struct
@@ -363,69 +379,53 @@ proc submitCommandBuffer(x: var MandelbrotGenerator) =
   # Submit the command buffer
   checkVkResult vkQueueSubmit(x.queue, 1, submitInfo.addr, fence)
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
-  checkVkResult vkWaitForFences(x.device, 1, fence.addr, true.VkBool32, high(uint64))
+  checkVkResult vkWaitForFences(x.device, 1, fence.addr, VkBool32(true), high(uint64))
   vkDestroyFence(x.device, fence, nil)
 
 when defined(vkDebug):
-  proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
-    let severityFlags = VkDebugUtilsMessageSeverityFlagBitsEXT(
-      VerboseBit.uint32 or InfoBit.uint32 or WarningBit.uint32 or ErrorBit.uint32
-    )
-    let messageTypeFlags = VkDebugUtilsMessageTypeFlagBitsEXT(
-      GeneralBit.uint32 or ValidationBit.uint32 or PerformanceBit.uint32
-    )
-    let createInfo = VkDebugUtilsMessengerCreateInfoEXT(
-      messageSeverity: severityFlags,
-      messageType: messageTypeFlags,
-      pfnUserCallback: debugCallback
-    )
-    checkVkResult vkCreateDebugUtilsMessengerEXT(x.instance, createInfo, nil, x.debugUtilsMessenger)
-
   proc debugCallback(messageSeverity: VkDebugUtilsMessageSeverityFlagBitsEXT,
                     messageTypes: VkDebugUtilsMessageTypeFlagsEXT,
                     pCallbackData: ptr VkDebugUtilsMessengerCallbackDataEXT,
                     pUserData: pointer): VkBool32 {.cdecl.} =
     stderr.write(pCallbackData.pMessage)
     stderr.write("\n")
-    return VkFalse
+    return VkBool32(false)
 
-proc cleanup(x: MandelbrotGenerator) =
-  # Clean up
-  vkFreeMemory(x.device, x.uniformBufferMemory, nil)
-  vkDestroyBuffer(x.device, x.uniformBuffer, nil)
-  vkFreeMemory(x.device, x.storageBufferMemory, nil)
-  vkDestroyBuffer(x.device, x.storageBuffer, nil)
-  vkDestroyPipeline(x.device, x.pipeline, nil)
-  vkDestroyPipelineLayout(x.device, x.pipelineLayout, nil)
-  vkDestroyDescriptorPool(x.device, x.descriptorPool, nil)
-  vkDestroyDescriptorSetLayout(x.device, x.descriptorSetLayout, nil)
-  vkDestroyCommandPool(x.device, x.commandPool, nil)
-  vkDestroyDevice(x.device, nil)
-  when defined(vkDebug):
-    vkDestroyDebugUtilsMessengerEXT(x.instance, x.debugUtilsMessenger, nil)
-  vkDestroyInstance(x.instance, nil)
+  proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
+    let severityFlags = VkDebugUtilsMessageSeverityFlagsEXT(
+      VerboseBit.uint32 or InfoBit.uint32 or
+      VkDebugUtilsMessageSeverityFlagBitsEXT.WarningBit.uint32 or
+      VkDebugUtilsMessageSeverityFlagBitsEXT.ErrorBit.uint32
+    )
+    let messageTypeFlags = VkDebugUtilsMessageTypeFlagsEXT(
+      GeneralBit.uint32 or
+      VkDebugUtilsMessageTypeFlagBitsEXT.ValidationBit.uint32 or PerformanceBit.uint32
+    )
+    let createInfo = VkDebugUtilsMessengerCreateInfoEXT(
+      messageSeverity: severityFlags,
+      messageType: messageTypeFlags,
+      pfnUserCallback: debugCallback
+    )
+    checkVkResult vkCreateDebugUtilsMessengerEXT(x.instance, createInfo.addr, nil, x.debugUtilsMessenger.addr)
 
 proc generate*(x: var MandelbrotGenerator): seq[uint8] =
   ## Return the raw data of a mandelbrot image.
-  try:
-    vkPreload()
-    # Hardware Setup Stage
-    createInstance(x)
-    vkInit(x.instance, load1_2 = false, load1_3 = false)
-    when defined(vkDebug):
-      setupDebugUtilsMessenger(x)
-    findPhysicalDevice(x)
-    createDevice(x)
-    # Resource Setup Stage
-    createBuffers(x)
-    # Pipeline Setup Stage
-    createDescriptorSetLayout(x)
-    createDescriptorSets(x)
-    createComputePipeline(x)
-    # Command Execution Stage
-    createCommandBuffer(x)
-    submitCommandBuffer(x)
-    # Fetch data from VRAM to RAM.
-    result = fetchRenderedImage(x)
-  finally:
-    cleanup(x)
+  vkPreload()
+  # Hardware Setup Stage
+  createInstance(x)
+  vkInit(x.instance, load1_2 = false, load1_3 = false)
+  when defined(vkDebug):
+    setupDebugUtilsMessenger(x)
+  findPhysicalDevice(x)
+  createDevice(x)
+  # Resource Setup Stage
+  createBuffers(x)
+  # Pipeline Setup Stage
+  createDescriptorSetLayout(x)
+  createDescriptorSets(x)
+  createComputePipeline(x)
+  # Command Execution Stage
+  createCommandBuffer(x)
+  submitCommandBuffer(x)
+  # Fetch data from VRAM to RAM.
+  result = fetchRenderedImage(x)
