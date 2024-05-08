@@ -189,7 +189,8 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
   # Allocate memory for the buffer
   let allocInfo = newVkMemoryAllocateInfo(
     allocationSize = bufferMemoryRequirements.size,
-    memoryTypeIndex = findMemoryType(x.physicalDevice, bufferMemoryRequirements.memoryTypeBits, size, properties)
+    memoryTypeIndex = findMemoryType(x.physicalDevice, bufferMemoryRequirements.memoryTypeBits,
+        bufferMemoryRequirements.size, properties)
   )
   var bufferMemory: VkDeviceMemory
   checkVkResult vkAllocateMemory(x.device, allocInfo.addr, nil, bufferMemory.addr)
