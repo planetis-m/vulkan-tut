@@ -1,13 +1,5 @@
 # Example from: https://github.com/hudiyu123/Vulkan-Mandelbrot-Generator
-import std/[strutils, os], mandelbrot, binstreams, qoi
-
-proc writeQoi(filename: string, data: sink seq[byte]; width, height: int) =
-  let header = Header(width: width.uint32, height: height.uint32, channels: RGBA, colorspace: sRGB)
-  let data = newMemStream(data, bigEndian)
-  let qoi = encodeQOI(header, data)
-  data.close()
-  writeFile(filename, qoi.data)
-  qoi.close()
+import std/[strutils, os], mandelbrot, bmp
 
 proc main(params: seq[string]) =
   if params.len != 2:
@@ -17,7 +9,7 @@ proc main(params: seq[string]) =
     let height = params[1].parseInt
     var x = newMandelbrotGenerator(width.int32, height.int32)
     let rawImage = x.generate()
-    writeQoi("mandelbrot.qoi", rawImage, width, height)
+    writeFile "mandelbrot.bmp", encodeBmp(width, height, rawImage)
   except:
     quit("unknown exception: " & getCurrentExceptionMsg())
 
