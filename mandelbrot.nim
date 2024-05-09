@@ -1,5 +1,5 @@
 # https://youtu.be/1BMGTyIF5dI
-import vulkan, std/[sequtils, math]
+import vulkan, std/[sequtils, math], chroma
 
 type
   MandelbrotGenerator* = object
@@ -58,16 +58,16 @@ proc newMandelbrotGenerator*(width, height: int32): MandelbrotGenerator =
     workgroupSize: WorkgroupSize(x: 32, y: 32)
   )
 
-proc fetchRenderedImage(x: MandelbrotGenerator): seq[uint8] =
-  let count = 4*x.width*x.height
+proc fetchRenderedImage(x: MandelbrotGenerator): seq[ColorRGBX] =
+  let count = x.width*x.height
   var mappedMemory: pointer = nil
   checkVkResult vkMapMemory(x.device, x.storageBufferMemory, 0.VkDeviceSize,
-      VkDeviceSize(sizeof(float32)*count), 0.VkMemoryMapFlags, mappedMemory.addr)
+      VkDeviceSize(sizeof(float32)*count*4), 0.VkMemoryMapFlags, mappedMemory.addr)
   let data = cast[ptr UncheckedArray[float32]](mappedMemory)
-  result = newSeq[uint8](count)
+  result = newSeq[ColorRGBX](count)
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).
-  for i in 0 ..< count.int:
-    result[i] = uint8(255*data[i])
+  for i in countup(0, result.high, 4):
+    result[i] = rgbx(Color(r: data[i], g: data[i+1], b: data[i+2], a: 1))
   vkUnmapMemory(x.device, x.storageBufferMemory)
 
 proc getLayers(): seq[cstring] =
@@ -430,7 +430,7 @@ when defined(vkDebug):
     )
     checkVkResult vkCreateDebugUtilsMessengerEXT(x.instance, createInfo.addr, nil, x.debugUtilsMessenger.addr)
 
-proc generate*(x: var MandelbrotGenerator): seq[uint8] =
+proc generate*(x: var MandelbrotGenerator): seq[ColorRGBX] =
   ## Return the raw data of a mandelbrot image.
   try:
     vkPreload()

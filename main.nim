@@ -1,5 +1,5 @@
 # Example from: https://github.com/hudiyu123/Vulkan-Mandelbrot-Generator
-import std/[strutils, os], mandelbrot, nimPNG
+import std/[strutils, os], mandelbrot, pixie
 
 proc main(params: seq[string]) =
   if params.len != 2:
@@ -8,12 +8,8 @@ proc main(params: seq[string]) =
     let width = params[0].parseInt
     let height = params[1].parseInt
     var x = newMandelbrotGenerator(width.int32, height.int32)
-    let rawImage = x.generate()
-    let settings = makePNGEncoder()
-    settings.autoConvert = false
-    let res = savePNG32("mandelbrot.png", rawImage, width, height, settings)
-    if res.isErr:
-      quit("Failed to encode image" & res.error)
+    let rawImage = Image(data: x.generate(), width: width, height: height)
+    writeFile rawImage, "mandelbrot.png"
   except:
     quit("unknown exception: " & getCurrentExceptionMsg())
 
