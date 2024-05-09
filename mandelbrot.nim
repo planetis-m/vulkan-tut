@@ -62,12 +62,12 @@ proc fetchRenderedImage(x: MandelbrotGenerator): seq[ColorRGBX] =
   let count = x.width*x.height
   var mappedMemory: pointer = nil
   checkVkResult vkMapMemory(x.device, x.storageBufferMemory, 0.VkDeviceSize,
-      VkDeviceSize(sizeof(float32)*count*4), 0.VkMemoryMapFlags, mappedMemory.addr)
-  let data = cast[ptr UncheckedArray[float32]](mappedMemory)
+      VkDeviceSize(sizeof(Color)*count), 0.VkMemoryMapFlags, mappedMemory.addr)
+  let data = cast[ptr UncheckedArray[Color]](mappedMemory)
   result = newSeq[ColorRGBX](count)
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).
-  for i in countup(0, result.high, 4):
-    result[i] = rgbx(Color(r: data[i], g: data[i+1], b: data[i+2], a: 1))
+  for i in 0..result.high:
+    result[i] = rgbx(data[i])
   vkUnmapMemory(x.device, x.storageBufferMemory)
 
 proc getLayers(): seq[cstring] =
