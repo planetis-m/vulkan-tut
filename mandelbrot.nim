@@ -78,7 +78,7 @@ proc getLayers(): seq[cstring] =
 proc getExtensions(): seq[cstring] =
   result = @[]
   when defined(vkDebug):
-    result.add("VK_EXT_debug_utils")
+    result.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
 
 template toCStringArray(x: seq[cstring]): untyped =
   if x.len > 0: cast[cstringArray](addr x[0]) else: nil
@@ -380,8 +380,8 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   vkCmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipelineLayout,
       0, 1, x.descriptorSets[0].addr, 0, nil)
   # Dispatch the compute work
-  let numWorkgroupX = uint32(ceil(float32(x.width) / float32(x.workgroupSize.x)))
-  let numWorkgroupY = uint32(ceil(float32(x.height) / float32(x.workgroupSize.y)))
+  let numWorkgroupX = ceil(x.width.float32/x.workgroupSize.x.float32).uint32
+  let numWorkgroupY = ceil(x.height.float32/x.workgroupSize.y.float32).uint32
   vkCmdDispatch(x.commandBuffer, numWorkgroupX, numWorkgroupY, 1)
   # End recording the command buffer
   checkVkResult vkEndCommandBuffer(x.commandBuffer)

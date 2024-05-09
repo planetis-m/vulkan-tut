@@ -9,7 +9,9 @@ proc main(params: seq[string]) =
     let height = params[1].parseInt
     var x = newMandelbrotGenerator(width.int32, height.int32)
     let rawImage = x.generate()
-    let res = savePNG32("mandelbrot.png", rawImage, width, height)
+    let settings = makePNGEncoder()
+    settings.autoConvert = false
+    let res = savePNG32("mandelbrot.png", rawImage, width, height, settings)
     if res.isErr:
       quit("Failed to encode image" & res.error)
   except:
