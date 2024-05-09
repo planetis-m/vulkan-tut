@@ -4,7 +4,7 @@ const
   bmpSignature = "BM"
   LCS_sRGB = 0x73524742
 
-proc encodeDib*(width, height: int, data: openArray[ColorRGBA]): string {.raises: [].} =
+proc encodeDib*(width, height: int, data: openArray[ColorRGBA]): string =
   ## Encodes an image into a DIB.
 
   # BITMAPINFO containing BITMAPV5HEADER
@@ -34,7 +34,7 @@ proc encodeDib*(width, height: int, data: openArray[ColorRGBA]): string {.raises
       let rgba = data[(height - y - 1)*width + x]
       result.addUint32(cast[uint32](rgba))
 
-proc encodeBmp*(width, height: int, data: openArray[ColorRGBA]): string {.raises: [].} =
+proc encodeBmp*(width, height: int, data: openArray[ColorRGBA]): string =
   ## Encodes an image into the BMP file format.
 
   # BMP Header
