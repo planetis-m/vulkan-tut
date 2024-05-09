@@ -1,12 +1,13 @@
 # Example from: https://github.com/hudiyu123/Vulkan-Mandelbrot-Generator
 import std/[strutils, os], mandelbrot, binstreams, qoi
 
-proc writeQoi(filename: string, data: seq[byte]; width, height: int) =
+proc writeQoi(filename: string, data: sink seq[byte]; width, height: int) =
   let header = Header(width: width.uint32, height: height.uint32, channels: RGBA, colorspace: sRGB)
   let data = newMemStream(data, bigEndian)
   let qoi = encodeQOI(header, data)
-  echo qoi.data.len
+  data.close()
   writeFile(filename, qoi.data)
+  qoi.close()
 
 proc main(params: seq[string]) =
   if params.len != 2:
