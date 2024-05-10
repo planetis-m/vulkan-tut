@@ -3,7 +3,7 @@ import chroma, std/paths
 proc c_free*(p: pointer) {.importc: "free", header: "<stdlib.h>".}
 
 const dir = currentSourcePath().Path.parentDir
-{.passc: "-I." & dir.string.}
+{.passc: "-I" & dir.string.}
 
 type
   QoiDesc {.importc: "qoi_desc", header: "qoi.h", byref.} = object
