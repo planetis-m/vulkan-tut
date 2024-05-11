@@ -1,5 +1,5 @@
 # https://youtu.be/1BMGTyIF5dI
-import vulkan, std/[sequtils, math], chroma
+import vulkan, vulkan_wrapper, std/[sequtils, math], chroma
 
 type
   MandelbrotGenerator* = object
@@ -27,13 +27,6 @@ type
   WorkgroupSize = object
     x, y: uint32
 
-template checkVkResult(call: untyped) =
-  when defined(danger):
-    discard call
-  else:
-    {.line: instantiationInfo().}:
-      assert call == VkSuccess
-
 proc cleanup(x: MandelbrotGenerator) =
   # Clean up
   vkFreeMemory(x.device, x.uniformBufferMemory, nil)
@@ -60,15 +53,14 @@ proc newMandelbrotGenerator*(width, height: int32): MandelbrotGenerator =
 
 proc fetchRenderedImage(x: MandelbrotGenerator): seq[ColorRGBA] =
   let count = x.width*x.height
-  var mappedMemory: pointer = nil
-  checkVkResult vkMapMemory(x.device, x.storageBufferMemory, 0.VkDeviceSize,
-      VkDeviceSize(sizeof(Color)*count), 0.VkMemoryMapFlags, mappedMemory.addr)
+  let mappedMemory = mapMemory(x.device, x.storageBufferMemory, 0.VkDeviceSize,
+      VkDeviceSize(sizeof(Color)*count), 0.VkMemoryMapFlags)
   let data = cast[ptr UncheckedArray[Color]](mappedMemory)
   result = newSeq[ColorRGBA](count)
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).
   for i in 0..result.high:
     result[i] = rgba(data[i])
-  vkUnmapMemory(x.device, x.storageBufferMemory)
+  unmapMemory(x.device, x.storageBufferMemory)
 
 proc getLayers(): seq[cstring] =
   result = @[]
@@ -94,10 +86,7 @@ proc createInstance(x: var MandelbrotGenerator) =
   )
   when defined(vkDebug):
     # Enable the Khronos validation layer
-    var layerCount: uint32 = 0
-    discard vkEnumerateInstanceLayerProperties(layerCount.addr, nil)
-    var layerProperties = newSeq[VkLayerProperties](layerCount)
-    discard vkEnumerateInstanceLayerProperties(layerCount.addr, layerProperties[0].addr)
+    let layerProperties = enumerateInstanceLayerProperties()
     let foundValidationLayer = layerProperties.anyIt(
         "VK_LAYER_KHRONOS_validation" == cast[cstring](it.layerName.addr))
     assert foundValidationLayer, "Validation layer required, but not available"
@@ -111,14 +100,11 @@ proc createInstance(x: var MandelbrotGenerator) =
     enabledExtensionCount = uint32(extensions.len),
     ppEnabledExtensionNames = extensions.toCStringArray
   )
-  checkVkResult vkCreateInstance(instanceCreateInfo.addr, nil, x.instance.addr)
+  x.instance = createInstance(instanceCreateInfo, nil)
 
 proc findPhysicalDevice(x: var MandelbrotGenerator) =
   # Enumerate physical devices
-  var physicalDeviceCount: uint32 = 0
-  discard vkEnumeratePhysicalDevices(x.instance, physicalDeviceCount.addr, nil)
-  var physicalDevices = newSeq[VkPhysicalDevice](physicalDeviceCount)
-  discard vkEnumeratePhysicalDevices(x.instance, physicalDeviceCount.addr, physicalDevices[0].addr)
+  let physicalDevices = enumeratePhysicalDevices(x.instance)
   assert physicalDevices.len > 0, "Cannot find any physical devices."
   # We simply choose the first available physical device.
   x.physicalDevice = physicalDevices[0]
@@ -207,7 +193,7 @@ proc createBuffers(x: var MandelbrotGenerator) =
   (x.uniformBuffer, x.uniformBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(int32)*2),
     VkBufferUsageFlags{VkBufferUsageFlagBits.UniformBufferBit},
-    VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit.uint32})
+    VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit})
   # Map the memory and write to the uniform buffer
   var mappedMemory: pointer = nil
   checkVkResult vkMapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
@@ -418,9 +404,10 @@ when defined(vkDebug):
 
   proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
     let severityFlags = VkDebugUtilsMessageSeverityFlagsEXT{
-      VerboseBit, InfoBit, WarningBit, ErrorBit}
+      VerboseBit, InfoBit, VkDebugUtilsMessageSeverityFlagBitsEXT.WarningBit,
+      VkDebugUtilsMessageSeverityFlagBitsEXT.ErrorBit}
     let messageTypeFlags = VkDebugUtilsMessageTypeFlagsEXT{
-      GeneralBit, ValidationBit, PerformanceBit}
+      GeneralBit, VkDebugUtilsMessageTypeFlagBitsEXT.ValidationBit, PerformanceBit}
     let createInfo = newVkDebugUtilsMessengerCreateInfoEXT(
       messageSeverity = severityFlags,
       messageType = messageTypeFlags,
