@@ -9,8 +9,8 @@ proc main(params: seq[string]) =
     let height = params[1].parseInt
     var x = newMandelbrotGenerator(width.int32, height.int32)
     let qoi = Qoi(data: x.generate(), width: width, height: height, channels: 4)
-    let data = encodeQoi(qoi)
-    writeFile("mandelbrot.qoi", data)
+    let str = encodeQoi(qoi)
+    writeFile("mandelbrot.qoi", str)
   except:
     quit("unknown exception: " & getCurrentExceptionMsg())
 

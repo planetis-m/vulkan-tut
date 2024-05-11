@@ -202,12 +202,12 @@ proc createBuffers(x: var MandelbrotGenerator) =
   # Allocate memory for both buffers
   (x.storageBuffer, x.storageBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(float32)*4*x.width*x.height),
-    VkBufferUsageFlags(VkBufferUsageFlagBits.StorageBufferBit),
-    VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32))
+    VkBufferUsageFlags{VkBufferUsageFlagBits.StorageBufferBit},
+    VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit})
   (x.uniformBuffer, x.uniformBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(int32)*2),
-    VkBufferUsageFlags(VkBufferUsageFlagBits.UniformBufferBit),
-    VkMemoryPropertyFlags(HostCoherentBit.uint32 or HostCoherentBit.uint32))
+    VkBufferUsageFlags{VkBufferUsageFlagBits.UniformBufferBit},
+    VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit.uint32})
   # Map the memory and write to the uniform buffer
   var mappedMemory: pointer = nil
   checkVkResult vkMapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
@@ -309,7 +309,8 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
   let computeShaderCode = readFile("build/shaders/mandelbrot.spv")
   let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
     codeSize = computeShaderCode.len.uint,
-    pCode = cast[ptr uint32](computeShaderCode[0].addr))
+    pCode = cast[ptr uint32](computeShaderCode[0].addr)
+  )
   var computeShaderModule: VkShaderModule
   checkVkResult vkCreateShaderModule(x.device, shaderModuleCreateInfo.addr, nil, computeShaderModule.addr)
   let specializationMapEntries = [
@@ -366,7 +367,7 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
     commandPool = x.commandPool,
     level = VkCommandBufferLevel.Primary,
     commandBufferCount = 1
-    )
+  )
   checkVkResult vkAllocateCommandBuffers(x.device, commandBufferAllocateInfo.addr, x.commandBuffer.addr)
   # Begin recording the command buffer
   let commandBufferBeginInfo = newVkCommandBufferBeginInfo(
@@ -416,13 +417,10 @@ when defined(vkDebug):
     return VkBool32(false)
 
   proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
-    let severityFlags = VkDebugUtilsMessageSeverityFlagsEXT(
-      VerboseBit.uint32 or InfoBit.uint32 or
-      VkDebugUtilsMessageSeverityFlagBitsEXT.WarningBit.uint32 or
-      VkDebugUtilsMessageSeverityFlagBitsEXT.ErrorBit.uint32)
-    let messageTypeFlags = VkDebugUtilsMessageTypeFlagsEXT(
-      GeneralBit.uint32 or
-      VkDebugUtilsMessageTypeFlagBitsEXT.ValidationBit.uint32 or PerformanceBit.uint32)
+    let severityFlags = VkDebugUtilsMessageSeverityFlagsEXT{
+      VerboseBit, InfoBit, WarningBit, ErrorBit}
+    let messageTypeFlags = VkDebugUtilsMessageTypeFlagsEXT{
+      GeneralBit, ValidationBit, PerformanceBit}
     let createInfo = newVkDebugUtilsMessengerCreateInfoEXT(
       messageSeverity = severityFlags,
       messageType = messageTypeFlags,
