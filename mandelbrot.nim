@@ -60,7 +60,7 @@ proc fetchRenderedImage(x: MandelbrotGenerator): seq[ColorRGBA] =
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).
   for i in 0..result.high:
     result[i] = rgba(data[i])
-  unmapMemory(x.device, x.storageBufferMemory)
+  vkUnmapMemory(x.device, x.storageBufferMemory)
 
 proc getLayers(): seq[cstring] =
   result = @[]
@@ -192,7 +192,7 @@ proc createBuffers(x: var MandelbrotGenerator) =
       VkDeviceSize(sizeof(int32)*2), 0.VkMemoryMapFlags)
   let ubo = [x.width.int32, x.height.int32]
   copyMem(mappedMemory, ubo.addr, sizeof(int32)*2)
-  unmapMemory(x.device, x.uniformBufferMemory)
+  vkUnmapMemory(x.device, x.uniformBufferMemory)
 
 proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
   # Define the descriptor set layout bindings

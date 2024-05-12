@@ -19,9 +19,6 @@ proc mapMemory*(device: VkDevice, memory: VkDeviceMemory, offset, size: VkDevice
   result = nil
   checkVkResult vkMapMemory(device, memory, offset, size, flags, result.addr)
 
-proc unmapMemory*(device: VkDevice, memory: VkDeviceMemory) =
-  vkUnmapMemory(device, memory)
-
 proc enumerateInstanceLayerProperties*: seq[VkLayerProperties] =
   result = @[]
   var layerCount: uint32 = 0
