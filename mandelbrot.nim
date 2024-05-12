@@ -73,7 +73,7 @@ proc getExtensions(): seq[cstring] =
     result.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
 
 template toCStringArray(x: seq[cstring]): untyped =
-  if x.len > 0: cast[cstringArray](addr x[0]) else: nil
+  if x.len == 0: nil else: cast[cstringArray](addr x[0])
 
 proc createInstance(x: var MandelbrotGenerator) =
   # Create an ApplicationInfo struct
@@ -100,7 +100,7 @@ proc createInstance(x: var MandelbrotGenerator) =
     enabledExtensionCount = uint32(extensions.len),
     ppEnabledExtensionNames = extensions.toCStringArray
   )
-  x.instance = createInstance(instanceCreateInfo, nil)
+  x.instance = createInstance(instanceCreateInfo)
 
 proc findPhysicalDevice(x: var MandelbrotGenerator) =
   # Enumerate physical devices
@@ -111,10 +111,7 @@ proc findPhysicalDevice(x: var MandelbrotGenerator) =
 
 proc getComputeQueueFamilyIndex(physicalDevice: VkPhysicalDevice): uint32 =
   # Find a compute queue family
-  var queueFamilyCount: uint32 = 0
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, nil)
-  var queueFamilyProperties = newSeq[VkQueueFamilyProperties](queueFamilyCount)
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, queueFamilyProperties[0].addr)
+  let queueFamilyProperties = getQueueFamilyProperties(physicalDevice)
   for i in 0 ..< queueFamilyProperties.len:
     let property = queueFamilyProperties[i]
     if property.queueCount > 0 and
@@ -141,15 +138,14 @@ proc createDevice(x: var MandelbrotGenerator) =
     pEnabledFeatures = nil
   )
   # Create a logical device
-  checkVkResult vkCreateDevice(x.physicalDevice, deviceCreateInfo.addr, nil, x.device.addr)
+  x.device = createDevice(x.physicalDevice, deviceCreateInfo)
   # Get the compute queue
-  vkGetDeviceQueue(x.device, x.queueFamilyIndex, 0, x.queue.addr)
+  x.queue = getDeviceQueue(x.device, x.queueFamilyIndex, 0)
 
 proc findMemoryType(physicalDevice: VkPhysicalDevice, typeFilter: uint32,
     size: VkDeviceSize, properties: VkMemoryPropertyFlags): uint32 =
   # Find a suitable memory type for a Vulkan physical device
-  var memoryProperties: VkPhysicalDeviceMemoryProperties
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice, memoryProperties.addr)
+  let memoryProperties = getMemoryProperties(physicalDevice)
   for i in 0 ..< memoryProperties.memoryTypeCount.int:
     let memoryType = memoryProperties.memoryTypes[i]
     if (typeFilter and (1'u32 shl i.uint32)) != 0 and
@@ -167,21 +163,18 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
     queueFamilyIndexCount = 0,
     pQueueFamilyIndices = nil
   )
-  var buffer: VkBuffer
-  checkVkResult vkCreateBuffer(x.device, bufferCreateInfo.addr, nil, buffer.addr)
+  let buffer = createBuffer(x.device, bufferCreateInfo)
   # Memory requirements
-  var bufferMemoryRequirements: VkMemoryRequirements
-  vkGetBufferMemoryRequirements(x.device, buffer, bufferMemoryRequirements.addr)
+  let bufferMemoryRequirements = getBufferMemoryRequirements(x.device, buffer)
   # Allocate memory for the buffer
   let allocInfo = newVkMemoryAllocateInfo(
     allocationSize = bufferMemoryRequirements.size,
     memoryTypeIndex = findMemoryType(x.physicalDevice, bufferMemoryRequirements.memoryTypeBits,
         bufferMemoryRequirements.size, properties)
   )
-  var bufferMemory: VkDeviceMemory
-  checkVkResult vkAllocateMemory(x.device, allocInfo.addr, nil, bufferMemory.addr)
+  let bufferMemory = allocateMemory(x.device, allocInfo)
   # Bind the memory to the buffer
-  checkVkResult vkBindBufferMemory(x.device, buffer, bufferMemory, 0.VkDeviceSize)
+  bindBufferMemory(x.device, buffer, bufferMemory, 0.VkDeviceSize)
   result = (buffer, bufferMemory)
 
 proc createBuffers(x: var MandelbrotGenerator) =
@@ -195,12 +188,11 @@ proc createBuffers(x: var MandelbrotGenerator) =
     VkBufferUsageFlags{VkBufferUsageFlagBits.UniformBufferBit},
     VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit})
   # Map the memory and write to the uniform buffer
-  var mappedMemory: pointer = nil
-  checkVkResult vkMapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
-      VkDeviceSize(sizeof(int32)*2), 0.VkMemoryMapFlags, mappedMemory.addr)
+  let mappedMemory = mapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
+      VkDeviceSize(sizeof(int32)*2), 0.VkMemoryMapFlags)
   let ubo = [x.width.int32, x.height.int32]
   copyMem(mappedMemory, ubo.addr, sizeof(int32)*2)
-  vkUnmapMemory(x.device, x.uniformBufferMemory)
+  unmapMemory(x.device, x.uniformBufferMemory)
 
 proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
   # Define the descriptor set layout bindings
@@ -225,8 +217,7 @@ proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
     bindingCount = bindings.len.uint32,
     pBindings = bindings[0].addr
   )
-  checkVkResult vkCreateDescriptorSetLayout(x.device, createInfo.addr,
-      nil, x.descriptorSetLayout.addr)
+  x.descriptorSetLayout = createDescriptorSetLayout(x.device, createInfo)
 
 proc createDescriptorSets(x: var MandelbrotGenerator) =
   # Create a descriptor pool
@@ -245,15 +236,14 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
     poolSizeCount = descriptorPoolSizes.len.uint32,
     pPoolSizes = descriptorPoolSizes[0].addr
   )
-  checkVkResult vkCreateDescriptorPool(x.device, descriptorPoolCreateInfo.addr, nil, x.descriptorPool.addr)
+  x.descriptorPool = createDescriptorPool(x.device, descriptorPoolCreateInfo)
   # Allocate a descriptor set
   let descriptorSetAllocateInfo = newVkDescriptorSetAllocateInfo(
     descriptorPool = x.descriptorPool,
     descriptorSetCount = 1,
     pSetLayouts = x.descriptorSetLayout.addr
   )
-  var descriptorSet: VkDescriptorSet
-  checkVkResult vkAllocateDescriptorSets(x.device, descriptorSetAllocateInfo.addr, descriptorSet.addr)
+  let descriptorSet = allocateDescriptorSets(x.device, descriptorSetAllocateInfo)
   x.descriptorSets = @[descriptorSet]
   # Update the descriptor set with the buffer information
   let descriptorStorageBufferInfo = newVkDescriptorBufferInfo(
@@ -288,7 +278,7 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
       pTexelBufferView = nil
     )
   ]
-  vkUpdateDescriptorSets(x.device, writeDescriptorSets.len.uint32, writeDescriptorSets[0].addr, 0, nil)
+  updateDescriptorSets(x.device, writeDescriptorSets, [])
 
 proc createComputePipeline(x: var MandelbrotGenerator) =
   # Create the shader module
@@ -297,8 +287,7 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
     codeSize = computeShaderCode.len.uint,
     pCode = cast[ptr uint32](computeShaderCode[0].addr)
   )
-  var computeShaderModule: VkShaderModule
-  checkVkResult vkCreateShaderModule(x.device, shaderModuleCreateInfo.addr, nil, computeShaderModule.addr)
+  let computeShaderModule = createShaderModule(x.device, shaderModuleCreateInfo)
   let specializationMapEntries = [
     newVkSpecializationMapEntry(
       constantID = 0,
@@ -330,16 +319,17 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
     pushConstantRangeCount = 0,
     pPushConstantRanges = nil
   )
-  checkVkResult vkCreatePipelineLayout(x.device, pipelineLayoutCreateInfo.addr, nil, x.pipelineLayout.addr)
+  x.pipelineLayout = createPipelineLayout(x.device, pipelineLayoutCreateInfo)
   # Create the compute pipeline
-  let computePipelineCreateInfo = newVkComputePipelineCreateInfo(
-    stage = shaderStageCreateInfo,
-    layout = x.pipelineLayout,
-    basePipelineHandle = 0.VkPipeline,
-    basePipelineIndex = -1
-  )
-  checkVkResult vkCreateComputePipelines(x.device, 0.VkPipelineCache, 1,
-      computePipelineCreateInfo.addr, nil, x.pipeline.addr)
+  let createInfos = [
+    newVkComputePipelineCreateInfo(
+      stage = shaderStageCreateInfo,
+      layout = x.pipelineLayout,
+      basePipelineHandle = 0.VkPipeline,
+      basePipelineIndex = -1
+    )
+  ]
+  x.pipeline = createComputePipelines(x.device, 0.VkPipelineCache, createInfos)
   vkDestroyShaderModule(x.device, computeShaderModule, nil)
 
 proc createCommandBuffer(x: var MandelbrotGenerator) =
@@ -347,25 +337,25 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   let commandPoolCreateInfo = newVkCommandPoolCreateInfo(
     queueFamilyIndex = x.queueFamilyIndex
   )
-  checkVkResult vkCreateCommandPool(x.device, commandPoolCreateInfo.addr, nil, x.commandPool.addr)
+  x.commandPool = createCommandPool(x.device, commandPoolCreateInfo)
   # Allocate a command buffer from the command pool
   let commandBufferAllocateInfo = newVkCommandBufferAllocateInfo(
     commandPool = x.commandPool,
     level = VkCommandBufferLevel.Primary,
     commandBufferCount = 1
   )
-  checkVkResult vkAllocateCommandBuffers(x.device, commandBufferAllocateInfo.addr, x.commandBuffer.addr)
+  x.commandBuffer = allocateCommandBuffers(x.device, commandBufferAllocateInfo)
   # Begin recording the command buffer
   let commandBufferBeginInfo = newVkCommandBufferBeginInfo(
     flags = VkCommandBufferUsageFlags(VkCommandBufferUsageFlagBits.OneTimeSubmitBit),
     pInheritanceInfo = nil
   )
-  checkVkResult vkBeginCommandBuffer(x.commandBuffer, commandBufferBeginInfo.addr)
+  beginCommandBuffer(x.commandBuffer, commandBufferBeginInfo)
   # Bind the compute pipeline
   vkCmdBindPipeline(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipeline)
   # Bind the descriptor set
-  vkCmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipelineLayout,
-      0, 1, x.descriptorSets[0].addr, 0, nil)
+  cmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipelineLayout,
+      0, x.descriptorSets, [])
   # Dispatch the compute work
   let numWorkgroupX = ceil(x.width.float32/x.workgroupSize.x.float32).uint32
   let numWorkgroupY = ceil(x.height.float32/x.workgroupSize.y.float32).uint32
@@ -374,30 +364,31 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   checkVkResult vkEndCommandBuffer(x.commandBuffer)
 
 proc submitCommandBuffer(x: var MandelbrotGenerator) =
-  let submitInfo = newVkSubmitInfo(
-    waitSemaphoreCount = 0,
-    pWaitSemaphores = nil,
-    pWaitDstStageMask = nil,
-    commandBufferCount = 1,
-    pCommandBuffers = x.commandBuffer.addr,
-    signalSemaphoreCount = 0,
-    pSignalSemaphores = nil
-  )
+  let submitInfos = [
+    newVkSubmitInfo(
+      waitSemaphoreCount = 0,
+      pWaitSemaphores = nil,
+      pWaitDstStageMask = nil,
+      commandBufferCount = 1,
+      pCommandBuffers = x.commandBuffer.addr,
+      signalSemaphoreCount = 0,
+      pSignalSemaphores = nil
+    )
+  ]
   # Create a fence
   let fenceCreateInfo = newVkFenceCreateInfo()
-  var fence: VkFence
-  checkVkResult vkCreateFence(x.device, fenceCreateInfo.addr, nil, fence.addr)
+  let fence = createFence(x.device, fenceCreateInfo)
   # Submit the command buffer
-  checkVkResult vkQueueSubmit(x.queue, 1, submitInfo.addr, fence)
+  queueSubmit(x.queue, submitInfos, fence)
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
-  checkVkResult vkWaitForFences(x.device, 1, fence.addr, VkBool32(true), high(uint64))
+  waitForFence(x.device, fence, VkBool32(true), high(uint64))
   vkDestroyFence(x.device, fence, nil)
 
 when defined(vkDebug):
   proc debugCallback(messageSeverity: VkDebugUtilsMessageSeverityFlagBitsEXT,
-                    messageTypes: VkDebugUtilsMessageTypeFlagsEXT,
-                    pCallbackData: ptr VkDebugUtilsMessengerCallbackDataEXT,
-                    pUserData: pointer): VkBool32 {.cdecl.} =
+                     messageTypes: VkDebugUtilsMessageTypeFlagsEXT,
+                     pCallbackData: ptr VkDebugUtilsMessengerCallbackDataEXT,
+                     pUserData: pointer): VkBool32 {.cdecl.} =
     stderr.write(pCallbackData.pMessage)
     stderr.write("\n")
     return VkBool32(false)
@@ -413,7 +404,7 @@ when defined(vkDebug):
       messageType = messageTypeFlags,
       pfnUserCallback = debugCallback
     )
-    checkVkResult vkCreateDebugUtilsMessengerEXT(x.instance, createInfo.addr, nil, x.debugUtilsMessenger.addr)
+    x.debugUtilsMessenger = createDebugUtilsMessengerEXT(x.instance, createInfo)
 
 proc generate*(x: var MandelbrotGenerator): seq[ColorRGBA] =
   ## Return the raw data of a mandelbrot image.
