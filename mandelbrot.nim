@@ -361,9 +361,9 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   let numWorkgroupY = ceil(x.height.float32/x.workgroupSize.y.float32).uint32
   vkCmdDispatch(x.commandBuffer, numWorkgroupX, numWorkgroupY, 1)
   # End recording the command buffer
-  checkVkResult vkEndCommandBuffer(x.commandBuffer)
+  endCommandBuffer(x.commandBuffer)
 
-proc submitCommandBuffer(x: var MandelbrotGenerator) =
+proc submitCommandBuffer(x: MandelbrotGenerator) =
   let submitInfos = [
     newVkSubmitInfo(
       waitSemaphoreCount = 0,

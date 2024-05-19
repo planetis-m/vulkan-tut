@@ -121,3 +121,6 @@ proc beginCommandBuffer*(commandBuffer: VkCommandBuffer, beginInfo: VkCommandBuf
 
 proc cmdBindDescriptorSets*(commandBuffer: VkCommandBuffer, pipelineBindPoint: VkPipelineBindPoint, layout: VkPipelineLayout, firstSet: uint32, descriptorSets: openarray[VkDescriptorSet], dynamicOffsets: openarray[uint32]) =
   vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, layout, firstSet, descriptorSets.len.uint32, if descriptorSets.len == 0: nil else: cast[ptr VkDescriptorSet](descriptorSets), dynamicOffsets.len.uint32, if dynamicOffsets.len == 0: nil else: cast[ptr uint32](dynamicOffsets))
+
+proc endCommandBuffer*(commandBuffer: VkCommandBuffer) =
+  checkVkResult vkEndCommandBuffer(commandBuffer)
