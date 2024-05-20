@@ -10,6 +10,7 @@ requires "nim >= 2.1.0"
 # requires "https://github.com/planetis-m/vulkan.git >= 1.3.279"
 
 import std/os
+import std/private/globs
 from std/strutils import replace
 
 task compile_shaders, "Compile GLSL shaders to SPIR-V format":
@@ -23,7 +24,7 @@ task compile_shaders, "Compile GLSL shaders to SPIR-V format":
 
 after install:
   # when defined(windows):
-  echo thisDir()
+  echo thisDir().nativeToUnixPath
   var src = readFile("mandelbrot.nim")
   src = replace(src, "WorkgroupSize(x: 32, y: 32)", "WorkgroupSize(x: 16, y: 16)")
   writeFile("mandelbrot.nim", src)
