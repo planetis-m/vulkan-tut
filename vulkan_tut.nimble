@@ -23,6 +23,7 @@ task compile_shaders, "Compile GLSL shaders to SPIR-V format":
 
 after install:
   when defined(windows):
+    echo thisDir()
     var src = readFile("mandelbrot.nim")
     src = replace(src, "WorkgroupSize(x: 32, y: 32)", "WorkgroupSize(x: 16, y: 16)")
     writeFile(src)
