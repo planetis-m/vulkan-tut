@@ -26,4 +26,4 @@ after install:
   echo thisDir()
   var src = readFile("mandelbrot.nim")
   src = replace(src, "WorkgroupSize(x: 32, y: 32)", "WorkgroupSize(x: 16, y: 16)")
-  writeFile(src)
+  writeFile("mandelbrot.nim", src)
