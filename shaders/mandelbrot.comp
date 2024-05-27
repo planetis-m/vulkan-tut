@@ -18,6 +18,15 @@ layout (binding = 1) uniform UBO {
   int height;
 } ubo;
 
+vec3 palette(float t) {
+  vec3 d = vec3(0.3f, 0.3f, 0.5f);
+  vec3 e = vec3(-0.2f, -0.3f, -0.5f);
+  vec3 f = vec3(2.1f, 2.0f, 3.0f);
+  vec3 g = vec3(0.0f, 0.1f, 0.0f);
+
+  return d + e * cos(6.28318f * (f * t + g));
+}
+
 void main() {
   // In order to fit the work into workgroups, some unnecessary invocations are
   // launched. We terminate those invocations here.
@@ -41,12 +50,7 @@ void main() {
   }
 
   // We use a cosine palette to determine the color of pixels.
-  float t = float(n) / float(m);
-  vec3 d = vec3(0.3f, 0.3f, 0.5f);
-  vec3 e = vec3(-0.2f, -0.3f, -0.5f);
-  vec3 f = vec3(2.1f, 2.0f, 3.0f);
-  vec3 g = vec3(0.0f, 0.1f, 0.0f);
-  vec4 color = vec4(d + e * cos(6.28318f * (f * t + g)), 1.0f);
+  vec4 color = vec4(palette(float(n) / float(m)), 1.0f);
 
   // Store the color data into the storage buffer.
   image[ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = color;
