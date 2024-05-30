@@ -85,7 +85,7 @@ uint squares32(uint64_t ctr, uint64_t key) {
 float rand32(uint64_t ctr, uint64_t key, float max) {
   uint x = squares32(ctr, key);
   uint u = (0x7fU << 23U) | (x >> 9U);
-  return (uintBitsToFloat(u) - 1.0f) * max;
+  return (uintBitsToFloat(u) - 1.0) * max;
 }
 
 // Generate Gaussian random numbers using the Ratio of Uniforms method.
@@ -106,7 +106,7 @@ vec2 normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
 void main() {
   uint id = gl_GlobalInvocationID.x;
   uint64_t ctr = id * 1000UL + 123456789UL;
-  vec2 tmp = normal(ctr, key, 0.0f, 1.0f);
+  vec2 tmp = normal(ctr, key, 0.0, 1.0);
   result[2 * id] = tmp[0];
   result[2 * id + 1] = tmp[1];
 }
