@@ -107,8 +107,12 @@ void main() {
   uint id = gl_GlobalInvocationID.x;
   uint64_t ctr = id * 1000UL + 123456789UL;
   vec2 tmp = normal(ctr, key, 0.0f, 1.0f);
-  result[2 * id] = tmp[0];
-  result[2 * id + 1] = tmp[1];
+  if (2 * id + 1 < result.length()) {
+    result[2 * id] = tmp[0];
+    result[2 * id + 1] = tmp[1];
+  } else if (2 * id < result.length()) {
+    result[2 * id] = tmp[0];
+  }
 }
 """
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
@@ -132,7 +136,7 @@ void main() {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Dispatch the compute shader
-  glDispatchCompute(NumElements div 2, 1, 1)
+  glDispatchCompute((NumElements + 1) div 2, 1, 1)
 
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
