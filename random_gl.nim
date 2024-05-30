@@ -1,4 +1,4 @@
-import opengl, opengl/glut
+import opengl, opengl/glut, std/stats
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -106,7 +106,7 @@ float normal(uint64_t ctr) {
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  uint64_t ctr = 123456789UL + id * 1000UL; // Use a large offset to avoid overlap
+  uint64_t ctr = baseCtr + id * 1000UL; // Use a large offset to avoid overlap
   float tmp = normal(ctr);
   result[id] = tmp;
 }
@@ -136,9 +136,18 @@ void main() {
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
+  var rs: RunningStat
   var bufferPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  echo "OUTPUT: ", bufferPtr[]
+  for i in 0 ..< NumElements:
+    rs.push(bufferPtr[i])
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
+  doAssert abs(rs.mean) < 0.08, $rs.mean
+  doAssert abs(rs.standardDeviation()-1.0) < 0.1
+  let bounds = [3.5, 5.0]
+  for a in [rs.max, -rs.min]:
+    doAssert a >= bounds[0] and a <= bounds[1]
+  rs.clear()
 
   # Clean up
   glDeleteProgram(shaderProgram)
