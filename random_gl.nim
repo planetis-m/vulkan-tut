@@ -46,7 +46,7 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Create buffers
-  const NumElements = 1024
+  const NumElements = 100_000
   const BufferSize = NumElements*sizeof(float32)
 
   var buffer: GLuint
@@ -67,8 +67,7 @@ layout(binding = 0) buffer lay0 {
   float result[];
 };
 
-const uint64_t key1 = 0xeb314a6fe49f6b17UL;
-const uint64_t key2 = 0x87a93f1dc428be57UL;
+const uint64_t key = 0x87a93f1dc428be57UL;
 
 uint squares32(uint64_t ctr, uint64_t key) {
   uint64_t x = ctr * key;
@@ -83,18 +82,18 @@ uint squares32(uint64_t ctr, uint64_t key) {
   return uint((x * x + z) >> 32u); // round 4
 }
 
-float rand32(uint64_t ctr, float max) {
-  uint x = squares32(ctr, key1);
+float rand32(uint64_t ctr, uint64_t key, float max) {
+  uint x = squares32(ctr, key);
   uint u = (0x7fU << 23U) | (x >> 9U);
   return (uintBitsToFloat(u) - 1.0f) * max;
 }
 
 // Generate Gaussian random numbers using the Ratio of Uniforms method.
-float normal(uint64_t ctr, float mu, float sigma) {
+float normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
   float a, b;
   do {
-    a = rand32(ctr, 1.0f);
-    b = rand32(ctr + 1UL, 1.0f) * 1.7156 - 0.8573;
+    a = rand32(ctr, key, 1.0f);
+    b = rand32(ctr + 1UL, key, 1.0f) * 1.7156 - 0.8573;
     ctr += 2UL; // Increment within the loop to generate a new random number each iteration
   } while (b * b > -4.0f * a * a * log(a));
 
@@ -104,8 +103,8 @@ float normal(uint64_t ctr, float mu, float sigma) {
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  uint64_t ctr = id * key2 + key1;
-  float tmp = normal(ctr, 0.0f, 1.0f);
+  uint64_t ctr = id * 100000UL;
+  float tmp = normal(ctr, key, 0.0f, 1.0f);
   result[id] = tmp;
 }
 """
