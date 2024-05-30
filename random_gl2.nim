@@ -47,7 +47,7 @@ proc main =
 
   # Create buffers
   const NumElements = 100_000
-  const BufferSize = NumElements*sizeof(float32)
+  const BufferSize = (NumElements + int(NumElements mod 2))*sizeof(float32)
 
   var buffer: GLuint
   glGenBuffers(1, buffer.addr)
@@ -107,12 +107,8 @@ void main() {
   uint id = gl_GlobalInvocationID.x;
   uint64_t ctr = id * 1000UL + 123456789UL;
   vec2 tmp = normal(ctr, key, 0.0f, 1.0f);
-  if (2 * id + 1 < result.length()) {
-    result[2 * id] = tmp[0];
-    result[2 * id + 1] = tmp[1];
-  } else if (2 * id < result.length()) {
-    result[2 * id] = tmp[0];
-  }
+  result[2 * id] = tmp[0];
+  result[2 * id + 1] = tmp[1];
 }
 """
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
