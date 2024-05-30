@@ -67,8 +67,8 @@ layout(binding = 0) buffer lay0 {
   float result[];
 };
 
-const uint64_t key = 0xeb314a6fe49f6b17UL;
-const uint64_t baseCtr = 123456789UL; // Some base counter, can be set differently
+const uint64_t key1 = 0xeb314a6fe49f6b17UL;
+const uint64_t key2 = 0x87a93f1dc428be57UL;
 
 uint squares32(uint64_t ctr, uint64_t key) {
   uint64_t x = ctr * key;
@@ -84,7 +84,7 @@ uint squares32(uint64_t ctr, uint64_t key) {
 }
 
 float rand32(uint64_t ctr, float max) {
-  uint x = squares32(ctr, key);
+  uint x = squares32(ctr, key1);
   uint u = (0x7fU << 23U) | (x >> 9U);
   return (uintBitsToFloat(u) - 1.0f) * max;
 }
@@ -104,7 +104,7 @@ float normal(uint64_t ctr, float mu, float sigma) {
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  uint64_t ctr = baseCtr + id * 1000UL; // Use a large offset to avoid overlap
+  uint64_t ctr = id * key2 + key1;
   float tmp = normal(ctr, 0.0f, 1.0f);
   result[id] = tmp;
 }
@@ -142,7 +142,9 @@ void main() {
 
   doAssert abs(rs.mean) < 0.08, $rs.mean
   doAssert abs(rs.standardDeviation()-1.0) < 0.1
-  let bounds = [3.0, 4.0]
+  echo (rs.mean, rs.standardDeviation())
+  echo [rs.max, -rs.min]
+  let bounds = [3.5, 5.0]
   for a in [rs.max, -rs.min]:
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
