@@ -135,6 +135,7 @@ void main() {
 """
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
   var shaderCodeCStr = allocCStringArray([shaderCode])
+  deallocCStringArray(shaderCodeCStr)
   glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
   glCompileShader(shaderModule)
 

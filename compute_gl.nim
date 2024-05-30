@@ -42,6 +42,7 @@ proc main =
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
   var shaderCodeCStr = allocCStringArray([shaderCode])
   glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
+  deallocCStringArray(shaderCodeCStr)
   glCompileShader(shaderModule)
 
   # Create the shader program
