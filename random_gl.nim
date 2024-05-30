@@ -103,7 +103,7 @@ float normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  uint64_t ctr = id * 100000UL;
+  uint64_t ctr = id * 1000UL + 123456789UL;
   float tmp = normal(ctr, key, 0.0f, 1.0f);
   result[id] = tmp;
 }
@@ -141,8 +141,6 @@ void main() {
 
   doAssert abs(rs.mean) < 0.08, $rs.mean
   doAssert abs(rs.standardDeviation()-1.0) < 0.1
-  echo (rs.mean, rs.standardDeviation())
-  echo [rs.max, -rs.min]
   let bounds = [3.5, 5.0]
   for a in [rs.max, -rs.min]:
     doAssert a >= bounds[0] and a <= bounds[1]
