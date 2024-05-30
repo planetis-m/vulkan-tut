@@ -1,4 +1,7 @@
-import opengl, opengl/glut, std/stats
+import opengl, opengl/glut, std/[stats, math]
+
+const
+  workgroupSizeX = 32
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -61,7 +64,7 @@ proc main =
 #version 460
 #extension GL_ARB_gpu_shader_int64 : require
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) buffer lay0 {
   float result[];
@@ -132,7 +135,8 @@ void main() {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Dispatch the compute shader
-  glDispatchCompute((NumElements + 1) div 2, 1, 1)
+  let numWorkgroupX = ceil(NumElements/(2*workgroupSizeX.float32)).GLuint
+  glDispatchCompute(numWorkgroupX, 1, 1)
 
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)

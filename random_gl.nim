@@ -107,9 +107,7 @@ float normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
 
 // Main function to execute compute shader
 void main() {
-  uint idX = gl_GlobalInvocationID.x;
-  uint idY = gl_GlobalInvocationID.y;
-  uint id = idY * gl_NumWorkGroups.x * gl_WorkGroupSize.x + idX;
+  uint id = gl_GlobalInvocationID.x;
   uint64_t ctr = id * 1000UL + 123456789UL;
   float tmp = normal(ctr, key, 0.0, 1.0);
   result[id] = tmp;
