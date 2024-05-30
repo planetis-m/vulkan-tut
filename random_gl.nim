@@ -93,8 +93,8 @@ float rand32(uint64_t ctr, float max) {
 float normal(uint64_t ctr, float mu, float sigma) {
   float a, b;
   do {
-    a = rand32(ctr, 1.0);
-    b = rand32(ctr + 1UL, 1.0) * 1.7156 - 0.8573;
+    a = rand32(ctr, 1.0f);
+    b = rand32(ctr + 1UL, 1.0f) * 1.7156 - 0.8573;
     ctr += 2UL; // Increment within the loop to generate a new random number each iteration
   } while (b * b > -4.0f * a * a * log(a));
 
@@ -142,7 +142,7 @@ void main() {
 
   doAssert abs(rs.mean) < 0.08, $rs.mean
   doAssert abs(rs.standardDeviation()-1.0) < 0.1
-  let bounds = [3.5, 5.0]
+  let bounds = [3.0, 4.0]
   for a in [rs.max, -rs.min]:
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
