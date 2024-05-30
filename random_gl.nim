@@ -90,24 +90,22 @@ float rand32(uint64_t ctr, float max) {
 }
 
 // Generate Gaussian random numbers using the Ratio of Uniforms method.
-float normal(uint64_t ctr) {
-  float u, v, s;
+float normal(uint64_t ctr, float mu, float sigma) {
+  float a, b;
   do {
-    u = rand32(ctr, 1.0);
-    v = rand32(ctr + 1UL, 1.0) * 1.7156 - 0.8573;
-    s = u * u + v * v;
+    a = rand32(ctr, 1.0);
+    b = rand32(ctr + 1UL, 1.0) * 1.7156 - 0.8573;
     ctr += 2UL; // Increment within the loop to generate a new random number each iteration
-  } while (s >= 1.0 || s == 0.0);
+  } while (b * b > -4.0f * a * a * log(a));
 
-  float factor = sqrt(-2.0 * log(s) / s);
-  return u * factor;
+  return mu + sigma * (b / a);
 }
 
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
   uint64_t ctr = baseCtr + id * 1000UL; // Use a large offset to avoid overlap
-  float tmp = normal(ctr);
+  float tmp = normal(ctr, 0.0f, 1.0f);
   result[id] = tmp;
 }
 """
