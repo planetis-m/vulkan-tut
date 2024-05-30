@@ -24,7 +24,7 @@ proc vkFindSuitableMemoryType(physicalDevice: VkPhysicalDevice, memTypeIndex: ou
   # Find a suitable memory type for a Vulkan physical device
   var memProperties: VkPhysicalDeviceMemoryProperties
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties.addr)
-  let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32 or HostCachedBit.uint32)
+  let memFlags = VkMemoryPropertyFlags(HostVisibleBit.uint32 or HostCoherentBit.uint32) # or HostCachedBit.uint32)
   for i in 0 ..< memProperties.memoryTypeCount.int:
     let memoryType = memProperties.memoryTypes[i]
     if (memoryType.propertyFlags.uint32 and memFlags.uint32) == memFlags.uint32 and

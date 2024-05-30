@@ -49,7 +49,7 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Matrix dimensions
-  const NumElements = 1_000_000
+  const NumElements = 100_000
   # Buffer size for the matrix
   const BufferSize = NumElements*sizeof(float32)
 
