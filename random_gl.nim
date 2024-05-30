@@ -1,7 +1,7 @@
 import opengl, opengl/glut, std/[stats, math]
 
 const
-  workgroupSize = (x: 32, y: 32)
+  workgroupSizeX = 32
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -49,10 +49,9 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Matrix dimensions
-  const M = 1000
-  const N = 1000
+  const NumElements = 1_000_000
   # Buffer size for the matrix
-  const BufferSize = M*N*sizeof(float32)
+  const BufferSize = NumElements*sizeof(float32)
 
   # Create buffer
   var buffer: GLuint
@@ -67,7 +66,7 @@ proc main =
 #version 460
 #extension GL_ARB_gpu_shader_int64 : require
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) buffer Res0 {
   float result[];
@@ -137,16 +136,15 @@ void main() {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Dispatch the compute shader
-  let numWorkgroupX = ceil(M/workgroupSize.x.float32).GLuint
-  let numWorkgroupY = ceil(N/workgroupSize.y.float32).GLuint
-  glDispatchCompute(numWorkgroupX, numWorkgroupY, 1)
+  let numWorkgroupX = ceil(NumElements/workgroupSizeX.float32).GLuint
+  glDispatchCompute(numWorkgroupX, 1, 1)
 
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
   var rs: RunningStat
-  var bufferPtr = cast[ptr array[M*N, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  for i in 0 ..< M*N:
+  var bufferPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  for i in 0 ..< NumElements:
     rs.push(bufferPtr[i])
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
