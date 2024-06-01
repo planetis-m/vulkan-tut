@@ -1,4 +1,4 @@
-import opengl, opengl/glut, std/[stats, math]
+import opengl, opengl/glut, std/[stats, math, strutils, times]
 
 const
   workgroupSizeX = 32
@@ -61,44 +61,38 @@ proc main =
 
   # Load the compute shader
   let shaderCode = """
+// https://www.shadertoy.com/view/ctj3Wc
 #version 460
-#extension GL_ARB_gpu_shader_int64 : require
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+uint rng_state;
 
 layout(binding = 0) buffer Res0 {
   float result[];
 };
 
-const uint64_t key = 0x87a93f1dc428be57UL;
-
-uint squares32(uint64_t ctr, uint64_t key) {
-  uint64_t x = ctr * key;
-  uint64_t y = x;
-  uint64_t z = y + key;
-  x = x * x + y;
-  x = (x >> 32u) | (x << 32u); // round 1
-  x = x * x + z;
-  x = (x >> 32u) | (x << 32u); // round 2
-  x = x * x + y;
-  x = (x >> 32u) | (x << 32u); // round 3
-  return uint((x * x + z) >> 32u); // round 4
+uint pcg_hash() {
+  rng_state = rng_state * 747796405u + 2891336453u;
+  uint state = rng_state;
+  uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+  return (word >> 22u) ^ word;
 }
 
-float rand32(uint64_t ctr, uint64_t key, float max) {
-  uint x = squares32(ctr, key);
+float rand32(float max) {
+  uint x = pcg_hash();
   uint u = (0x7fU << 23U) | (x >> 9U);
   return (uintBitsToFloat(u) - 1.0) * max;
 }
 
 // Generate Gaussian random numbers using the Marsaglia polar method.
-vec2 normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
+vec2 normal(float mu, float sigma) {
   float u, v, s;
   do {
-    u = 2.0 * rand32(ctr, key, 1.0) - 1.0;
-    v = 2.0 * rand32(ctr + 1UL, key, 1.0) - 1.0;
+    u = 2.0 * rand32(1.0) - 1.0;
+    v = 2.0 * rand32(1.0) - 1.0;
     s = u * u + v * v;
-    ctr += 2UL; // Increment within the loop to generate a new random number each iteration
+
   } while (s >= 1.0 || s == 0.0);
 
   float factor = sqrt(-2.0 * log(s) / s);
@@ -108,8 +102,8 @@ vec2 normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  uint64_t ctr = id * 1000UL + 123456789UL;
-  vec2 tmp = normal(ctr, key, 0.0, 1.0);
+  rng_state = id;
+  vec2 tmp = normal(0.0, 1.0);
   result[2 * id] = tmp[0];
   result[2 * id + 1] = tmp[1];
 }
@@ -134,6 +128,7 @@ void main() {
 
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
+  let t0 = cpuTime()
   # Dispatch the compute shader
   let numWorkgroupX = ceil(NumElements/(2*workgroupSizeX.float32)).GLuint
   glDispatchCompute(numWorkgroupX, 1, 1)
@@ -141,10 +136,13 @@ void main() {
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-  var rs: RunningStat
+  let t1 = cpuTime()
   var bufferPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  let t2 = cpuTime()
+  var rs: RunningStat
   for i in 0 ..< NumElements:
     rs.push(bufferPtr[i])
+  let t3 = cpuTime()
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   doAssert abs(rs.mean) < 0.08, $rs.mean
@@ -153,6 +151,11 @@ void main() {
   for a in [rs.max, -rs.min]:
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
+
+  template ff(f: float, prec: int = 4): string =
+   formatFloat(f*1000, ffDecimal, prec) # ms
+
+  echo ("Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2))
 
   # Clean up
   glDeleteProgram(shaderProgram)
