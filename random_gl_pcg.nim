@@ -66,33 +66,30 @@ proc main =
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
-uint rng_state;
-
 layout(binding = 0) buffer Res0 {
   float result[];
 };
 
-uint pcg_hash() {
+uint pcg_hash(inout uint rng_state) {
   rng_state = rng_state * 747796405u + 2891336453u;
   uint state = rng_state;
   uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
   return (word >> 22u) ^ word;
 }
 
-float rand32(float max) {
-  uint x = pcg_hash();
+float rand32(inout uint rng_state, float max) {
+  uint x = pcg_hash(rng_state);
   uint u = (0x7fU << 23U) | (x >> 9U);
   return (uintBitsToFloat(u) - 1.0) * max;
 }
 
 // Generate Gaussian random numbers using the Marsaglia polar method.
-vec2 normal(float mu, float sigma) {
+vec2 normal(inout uint rng_state, float mu, float sigma) {
   float u, v, s;
   do {
-    u = 2.0 * rand32(1.0) - 1.0;
-    v = 2.0 * rand32(1.0) - 1.0;
+    u = 2.0 * rand32(rng_state, 1.0) - 1.0;
+    v = 2.0 * rand32(rng_state, 1.0) - 1.0;
     s = u * u + v * v;
-
   } while (s >= 1.0 || s == 0.0);
 
   float factor = sqrt(-2.0 * log(s) / s);
@@ -102,8 +99,8 @@ vec2 normal(float mu, float sigma) {
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  rng_state = id;
-  vec2 tmp = normal(0.0, 1.0);
+  uint rng_state = id;
+  vec2 tmp = normal(rng_state, 0.0, 1.0);
   result[2 * id] = tmp[0];
   result[2 * id + 1] = tmp[1];
 }
