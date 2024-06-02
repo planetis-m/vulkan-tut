@@ -378,7 +378,7 @@ proc main =
   template ff(f: float, prec: int = 4): string =
    formatFloat(f*1000, ffDecimal, prec) # ms
 
-  echo ("Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2))
+  echo "Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2)
 
   # Clean up
   vkDestroyFence(device, fence, nil)
