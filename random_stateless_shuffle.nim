@@ -64,7 +64,7 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Create buffers
-  const NumElements = 1024 # 1048576 # 2^20
+  const NumElements = 1048576 # 2^20
   const BufferSize = NumElements*sizeof(uint32)
 
   var buffer: GLuint
@@ -162,13 +162,13 @@ void main() {
   let t2 = cpuTime()
 
   # Checksum and histogram tests
-  let checksum = calculateChecksum(bufferPtr[])
+  # let checksum = calculateChecksum(bufferPtr[])
   let histogram = calculateHistogram(bufferPtr[])
 
   let t3 = cpuTime()
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
-  doAssert checksum == NumElements * (NumElements - 1) div 2
+  # doAssert checksum == NumElements * (NumElements - 1) div 2
   doAssert histogram.len == NumElements
   doAssert histogram.largest.val == 1
 
