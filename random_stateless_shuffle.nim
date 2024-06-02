@@ -83,8 +83,8 @@ proc main =
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
-const int ROUNDS = 10;
-const int KEY_SET_LENGTH = ROUNDS / 2 + 1;
+const int HALF_ROUNDS = 10 / 2;
+const int KEY_SET_LENGTH = HALF_ROUNDS + 1;
 
 layout(binding = 0) buffer Res0 {
   uint result[];
@@ -98,13 +98,13 @@ uint rotate_left(uint x, int bits, int width) {
 }
 
 uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], int width) {
-  uint mask = ((1 << width) - 1);
+  uint mask = (1 << width) - 1;
   uint t = x;
-  for (int i = 0; i < ROUNDS / 2; i++) {
+  for (int i = 0; i < HALF_ROUNDS; i++) {
     t = (t + key_set[i]) & mask;
     t = rotate_left(t, 1, width);
   }
-  uint y = (t + key_set[ROUNDS / 2]) & mask;
+  uint y = (t + key_set[HALF_ROUNDS]) & mask;
   return y;
 }
 
