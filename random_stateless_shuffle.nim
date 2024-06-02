@@ -98,12 +98,13 @@ uint rotate_left(uint x, int bits, int width) {
 }
 
 uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], int width) {
+  uint mask = ((1 << width) - 1);
   uint t = x;
   for (int i = 0; i < ROUNDS / 2; i++) {
-    t = (t + key_set[i]) & ((1 << width) - 1);
+    t = (t + key_set[i]) & mask;
     t = rotate_left(t, 1, width);
   }
-  uint y = (t + key_set[ROUNDS / 2]) & ((1 << width) - 1);
+  uint y = (t + key_set[ROUNDS / 2]) & mask;
   return y;
 }
 
