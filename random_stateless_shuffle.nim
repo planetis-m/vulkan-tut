@@ -1,4 +1,4 @@
-import opengl, opengl/glut, std/[math, strutils, times, random, bitops]
+import opengl, opengl/glut, std/[math, strutils, times, random, bitops, tables]
 
 const
   workgroupSizeX = 32
@@ -37,6 +37,16 @@ proc generateRandomKeys(keys: var openarray[uint32], width: int) =
   for i in 0..keys.high:
     keys[i] = rand(uint32) and (1'u32 shl width) - 1'u32
 
+proc calculateChecksum(x: openarray[uint32]): uint32 =
+  result = 0
+  for i in 0..x.high:
+    result = result + x[i]
+
+proc calculateHistogram(x: openarray[uint32]): CountTable[uint32] =
+  result = CountTable[uint32]()
+  for i in 0..x.high:
+    inc result, x[i]
+
 proc main =
   randomize(123)
   # Create an OpenGL context and window
@@ -54,7 +64,7 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Create buffers
-  const NumElements = 64 #1048576 # 2^20
+  const NumElements = 1024 # 1048576 # 2^20
   const BufferSize = NumElements*sizeof(uint32)
 
   var buffer: GLuint
@@ -137,12 +147,12 @@ void main() {
   glUniform1i(widthLocation, width.GLint)
 
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
-  checkGLerror()
 
   let t0 = cpuTime()
   # Dispatch the compute shader
   const numWorkgroupX = ceilDiv(NumElements, workgroupSizeX).GLuint
   glDispatchCompute(numWorkgroupX, 1, 1)
+  checkGLerror()
 
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
@@ -150,12 +160,17 @@ void main() {
   let t1 = cpuTime()
   var bufferPtr = cast[ptr array[NumElements, uint32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   let t2 = cpuTime()
-  echo bufferPtr[]
-  # for i in 0 ..< NumElements:
-  #   bufferPtr[i]
+
+  # Checksum and histogram tests
+  let checksum = calculateChecksum(bufferPtr[])
+  let histogram = calculateHistogram(bufferPtr[])
 
   let t3 = cpuTime()
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
+  doAssert checksum == NumElements * (NumElements - 1) div 2
+  doAssert histogram.len == NumElements
+  doAssert histogram.largest.val == 1
 
   template ff(f: float, prec: int = 4): string =
    formatFloat(f*1000, ffDecimal, prec) # ms
