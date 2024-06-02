@@ -76,6 +76,9 @@ proc main =
 
   # Load the compute shader
   let shaderCode = """
+// J.-Y. Park et al., "Fully Parallel, One-Cycle Random Shuffling for Efficient
+// Countermeasure in Post-Quantum Cryptography," Cryptology ePrint Archive,
+// Report 2023/1889, 2023. [Online]. Available: https://eprint.iacr.org/2023/1889
 #version 460
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
