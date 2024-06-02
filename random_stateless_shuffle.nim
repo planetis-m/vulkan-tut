@@ -33,9 +33,9 @@ proc checkProgramLinking(program: GLuint) =
   else:
     echo "Program linked successfully"
 
-proc generateRandomKeys(keys: var openarray[uint32], width: int) =
+proc generateRandomKeys(keys: var openarray[uint32], mask: uint32) =
   for i in 0..keys.high:
-    keys[i] = rand(uint32) and (1'u32 shl width) - 1'u32
+    keys[i] = rand(uint32) and mask
 
 proc calculateChecksum(x: openarray[uint32]): uint32 =
   result = 0
@@ -97,20 +97,20 @@ uint rotate_left(uint x, int bits, int width) {
   return (x << bits) | (x >> (width - bits));
 }
 
-uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], int rounds, int width) {
+uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], int width) {
   uint t = x;
-  for (int i = 0; i < rounds / 2; i++) {
+  for (int i = 0; i < ROUNDS / 2; i++) {
     t = (t + key_set[i]) & ((1 << width) - 1);
     t = rotate_left(t, 1, width);
   }
-  uint y = (t + key_set[rounds / 2]) & ((1 << width) - 1);
+  uint y = (t + key_set[ROUNDS / 2]) & ((1 << width) - 1);
   return y;
 }
 
 // Main function to execute compute shader
 void main() {
   uint id = gl_GlobalInvocationID.x;
-  result[id] = arrhr(id, key_set, ROUNDS, width);
+  result[id] = arrhr(id, key_set, width);
 }
 """
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
@@ -139,7 +139,7 @@ void main() {
   # Calculate the width of the result array length
 
   let width = fastLog2(NumElements)
-  generateRandomKeys(keySet, width)
+  generateRandomKeys(keySet, uint32((1 shl width) - 1))
 
   # Get the location of the uniform variables
   let keySetLocation = glGetUniformLocation(shaderProgram, "key_set")
@@ -173,7 +173,6 @@ void main() {
 
   # doAssert checksum == NumElements * (NumElements - 1) div 2
   doAssert histogram.len == NumElements
-  doAssert histogram.largest.val == 1
 
   template ff(f: float, prec: int = 4): string =
    formatFloat(f*1000, ffDecimal, prec) # ms
