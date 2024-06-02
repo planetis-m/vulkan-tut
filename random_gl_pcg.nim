@@ -50,7 +50,7 @@ proc main =
 
   # Create buffers
   const NumElements = 100_000
-  const BufferSize = (NumElements + int(NumElements mod 2))*sizeof(float32)
+  const BufferSize = NumElements*sizeof(float32)
 
   var buffer: GLuint
   glGenBuffers(1, buffer.addr)

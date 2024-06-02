@@ -50,7 +50,7 @@ proc main =
 
   # Create buffers
   const NumElements = 100_000
-  const BufferSize = (NumElements + int(NumElements mod 2))*sizeof(float32)
+  const BufferSize = NumElements*sizeof(float32)
 
   var buffer: GLuint
   glGenBuffers(1, buffer.addr)
@@ -136,7 +136,7 @@ void main() {
 
   let t0 = cpuTime()
   # Dispatch the compute shader
-  let numWorkgroupX = ceil(NumElements/(2*workgroupSizeX.float32)).GLuint
+  const numWorkgroupX = ceilDiv(NumElements, 2*workgroupSizeX).GLuint
   glDispatchCompute(numWorkgroupX, 1, 1)
 
   # Synchronize and read back the results
