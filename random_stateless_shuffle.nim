@@ -97,8 +97,8 @@ uint rotate_left(uint x, int bits, int width) {
   return (x << bits) | (x >> (width - bits));
 }
 
-uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], int width) {
-  uint mask = (1 << width) - 1;
+uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], const int width) {
+  const uint mask = (1 << width) - 1;
   uint t = x;
   for (int i = 0; i < HALF_ROUNDS; i++) {
     t = (t + key_set[i]) & mask;

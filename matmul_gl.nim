@@ -1,4 +1,7 @@
-import opengl, opengl/glut
+import opengl, opengl/glut, std/[math, strutils, times, random]
+
+const
+  workgroupSize = (x: 32, y: 32)
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -30,7 +33,23 @@ proc checkProgramLinking(program: GLuint) =
   else:
     echo "Program linked successfully"
 
+proc computeElement(m, n, p, row, col: int): float32 =
+  result = 0
+  for k in 0..<n:
+    result += float32(row * n + k + 1) * float32(k * p + col + 1)
+
+proc checkRandomSamples(shaderResult: openarray[float32],
+    m, n, p, numSamples: int): bool =
+  result = true
+  for i in 0..<numSamples:
+    let row = rand(m-1)
+    let col = rand(p-1)
+    let cpuResult = computeElement(m, n, p, row, col)
+    if abs(shaderResult[row * p + col] - cpuResult) >= 1e-5:
+      return false
+
 proc main =
+  randomize()
   # Create an OpenGL context and window
   var argc: int32 = 0
   glutInit(addr argc, nil)
@@ -46,9 +65,9 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Matrix dimensions
-  const M = 4
-  const N = 3
-  const P = 4
+  const M = 1024
+  const N = 3072
+  const P = 1024
 
   # Create buffers
   var bufferA, bufferB, bufferC: GLuint
@@ -95,7 +114,7 @@ proc main =
 
   # Load the compute shader
   let shaderCode = """
-#version 450
+#version 460
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
@@ -135,8 +154,8 @@ void main() {
 """
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
   var shaderCodeCStr = allocCStringArray([shaderCode])
-  deallocCStringArray(shaderCodeCStr)
   glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
+  deallocCStringArray(shaderCodeCStr)
   glCompileShader(shaderModule)
 
   checkShaderCompilation(shaderModule)
@@ -155,15 +174,24 @@ void main() {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bufferB)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bufferC)
 
+  let t0 = cpuTime()
   # Dispatch the compute shader
-  glDispatchCompute((M + 15) div 16, (P + 15) div 16, 1)
+  glDispatchCompute(ceilDiv(M, workgroupSize.x).GLuint, ceilDiv(P, workgroupSize.y).GLuint, 1)
 
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
+  let t1 = cpuTime()
   var bufferCPtr = cast[ptr array[M * P, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  echo "OUTPUT: ", bufferCPtr[]
+  let t2 = cpuTime()
+  doAssert checkRandomSamples(bufferCPtr[], M, N, P, 100)
+  let t3 = cpuTime()
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
+  template ff(f: float, prec: int = 4): string =
+   formatFloat(f*1000, ffDecimal, prec) # ms
+
+  echo ("Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2))
 
   # Clean up
   glDeleteProgram(shaderProgram)
