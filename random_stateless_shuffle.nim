@@ -75,10 +75,8 @@ proc main =
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
 
   # Load the compute shader
-  let shaderCode = """
-// J.-Y. Park et al., "Fully Parallel, One-Cycle Random Shuffling for Efficient
-// Countermeasure in Post-Quantum Cryptography," Cryptology ePrint Archive,
-// Report 2023/1889, 2023. [Online]. Available: https://eprint.iacr.org/2023/1889
+  const shaderCode = """
+// J-Y Park et al, https://eprint.iacr.org/2023/1889
 #version 460
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
@@ -115,7 +113,7 @@ void main() {
 }
 """
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
+  let shaderCodeCStr = allocCStringArray([shaderCode])
   glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
   deallocCStringArray(shaderCodeCStr)
   glCompileShader(shaderModule)
@@ -139,8 +137,8 @@ void main() {
   var keySet: array[KeySetLength, uint32]
   # Calculate the width of the result array length
 
-  let width = fastLog2(NumElements)
-  generateRandomKeys(keySet, uint32((1 shl width) - 1))
+  const Width = fastLog2(NumElements) # only 2^n elements supported
+  generateRandomKeys(keySet, uint32((1 shl Width) - 1))
 
   # Get the location of the uniform variables
   let keySetLocation = glGetUniformLocation(shaderProgram, "key_set")
@@ -148,7 +146,7 @@ void main() {
 
   # Set uniforms
   glUniform1uiv(keySetLocation, KeySetLength, cast[ptr GLuint](addr keySet))
-  glUniform1i(widthLocation, width.GLint)
+  glUniform1i(widthLocation, Width.GLint)
 
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
@@ -172,13 +170,13 @@ void main() {
   let t3 = cpuTime()
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
-  # doAssert checksum == NumElements * (NumElements - 1) div 2
+  # doAssert checksum == (NumElements - 1) * NumElements div 2
   doAssert histogram.len == NumElements
 
   template ff(f: float, prec: int = 4): string =
    formatFloat(f*1000, ffDecimal, prec) # ms
 
-  echo "Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2)
+  echo "Process: ", ff(t1-t0), " Map: ", ff(t2-t1), " Read: ", ff(t3-t2)
 
   # Clean up
   glDeleteProgram(shaderProgram)

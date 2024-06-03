@@ -60,7 +60,7 @@ proc main =
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
 
   # Load the compute shader
-  let shaderCode = """
+  const shaderCode = """
 // https://www.shadertoy.com/view/ctj3Wc
 #version 460
 
@@ -152,7 +152,7 @@ void main() {
   template ff(f: float, prec: int = 4): string =
    formatFloat(f*1000, ffDecimal, prec) # ms
 
-  echo "Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2)
+  echo "Process: ", ff(t1-t0), " Map: ", ff(t2-t1), " Read: ", ff(t3-t2)
 
   # Clean up
   glDeleteProgram(shaderProgram)

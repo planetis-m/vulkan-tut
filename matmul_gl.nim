@@ -36,17 +36,17 @@ proc checkProgramLinking(program: GLuint) =
 proc computeElement(m, n, p, row, col: int): float32 =
   result = 0
   for k in 0..<n:
-    result += float32(row * n + k + 1) * float32(k * p + col + 1)
+    result = result + float32(row * n + k + 1) * float32(k * p + col + 1)
 
 proc checkRandomSamples(shaderResult: openarray[float32],
     m, n, p, numSamples: int): bool =
-  result = true
   for i in 0..<numSamples:
     let row = rand(m-1)
     let col = rand(p-1)
     let cpuResult = computeElement(m, n, p, row, col)
     if abs(shaderResult[row * p + col] - cpuResult) >= 1e-5:
       return false
+  result = true
 
 proc main =
   randomize()
@@ -65,9 +65,9 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Matrix dimensions
-  const M = 1024
-  const N = 3072
-  const P = 1024
+  const M = 128
+  const N = 32
+  const P = 128
 
   # Create buffers
   var bufferA, bufferB, bufferC: GLuint
@@ -113,10 +113,10 @@ proc main =
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, uniformBuffer)
 
   # Load the compute shader
-  let shaderCode = """
+  const shaderCode = """
 #version 460
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) buffer MatrixA {
   float dataA[];
@@ -139,16 +139,13 @@ layout(std140, binding = 3) uniform MatrixSize {
 void main() {
   uint row = gl_GlobalInvocationID.x;
   uint col = gl_GlobalInvocationID.y;
-
   if (row >= M || col >= P) {
     return;
   }
-
   float sum = 0.0;
   for (uint k = 0; k < N; ++k) {
     sum += dataA[row * N + k] * dataB[k * P + col];
   }
-
   dataC[row * P + col] = sum;
 }
 """
@@ -191,7 +188,7 @@ void main() {
   template ff(f: float, prec: int = 4): string =
    formatFloat(f*1000, ffDecimal, prec) # ms
 
-  echo "Process: ", ff(t1-t0), "Map: ", ff(t2-t1), "Read: ", ff(t3-t2)
+  echo "Process: ", ff(t1-t0), " Map: ", ff(t2-t1), " Read: ", ff(t3-t2)
 
   # Clean up
   glDeleteProgram(shaderProgram)
