@@ -1,13 +1,13 @@
-import opengl, opengl/glut
-import std/[math, strutils, os, sequtils]
+import opengl, opengl/glut, std/strutils
 
 const
-  ShaderCode = """
+  WorkGroupSize = 256
+  ShaderCode = format("""
 #version 460
 
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
 
-shared float sharedData[256];
+shared float sharedData[$1];
 
 layout(binding = 0) buffer InputBuffer {
   float inputData[];
@@ -38,7 +38,7 @@ void main() {
     outputData[gl_WorkGroupID.x] = sharedData[0];
   }
 }
-"""
+""", WorkGroupSize)
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -119,17 +119,17 @@ proc main() =
 
     # Initialize input data
     const numElements = 1024
-    const workGroupSize = 256
-    const numWorkGroups = numElements div workGroupSize
-
-    var inpData: array[numElements, float32]
-    for i in 0..<numElements:
-      inpData[i] = float32(i + 1)
+    const numWorkGroups = numElements div WorkGroupSize
 
     # Generate and bind SSBOs
-    # Input buffer
     x.inpBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, numElements*sizeof(float32),
-        addr inpData[0], GL_STATIC_DRAW)
+        nil, GL_STATIC_DRAW)
+
+    let inpDataPtr = cast[ptr array[numElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+    for i in 0..<numElements:
+      inpDataPtr[i] = float32(i + 1)
+    discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, x.inpBuffer)
 
     # Output buffer
@@ -137,7 +137,7 @@ proc main() =
         nil, GL_STATIC_DRAW)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, x.outBuffer)
 
-    # dispatch compute shader
+    # Dispatch the compute shader
     glDispatchCompute(numWorkGroups.GLuint, 1, 1)
 
     # Ensure all work is done
