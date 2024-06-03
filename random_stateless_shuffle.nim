@@ -1,7 +1,46 @@
-import opengl, opengl/glut, std/[math, strutils, times, random, bitops, tables]
+import opengl, opengl/glut
+import std/[math, strutils, times, random, bitops, tables]
 
 const
   workgroupSizeX = 32
+
+  shaderCode = """
+// J-Y Park et al, https://eprint.iacr.org/2023/1889
+#version 460
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+const int HALF_ROUNDS = 10 / 2;
+const int KEY_SET_LENGTH = HALF_ROUNDS + 1;
+
+layout(binding = 0) buffer Res0 {
+  uint result[];
+};
+
+uniform uint key_set[KEY_SET_LENGTH];
+uniform int width;
+
+uint rotate_left(uint x, int bits, int width) {
+  return (x << bits) | (x >> (width - bits));
+}
+
+uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], const int width) {
+  const uint mask = (1 << width) - 1;
+  uint t = x;
+  for (int i = 0; i < HALF_ROUNDS; i++) {
+    t = (t + key_set[i]) & mask;
+    t = rotate_left(t, 1, width);
+  }
+  uint y = (t + key_set[HALF_ROUNDS]) & mask;
+  return y;
+}
+
+// Main function to execute compute shader
+void main() {
+  uint id = gl_GlobalInvocationID.x;
+  result[id] = arrhr(id, key_set, width);
+}
+"""
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -53,6 +92,23 @@ proc main =
   let versionString = $cast[cstring](glGetString(GL_VERSION))
   echo "OpenGL Version: ", versionString
 
+  # Load the compute shader
+  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
+  let shaderCodeCStr = allocCStringArray([shaderCode])
+  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
+  deallocCStringArray(shaderCodeCStr)
+  glCompileShader(shaderModule)
+  checkShaderCompilation(shaderModule)
+
+  # Create the shader program
+  var shaderProgram = glCreateProgram()
+  glAttachShader(shaderProgram, shaderModule)
+  glLinkProgram(shaderProgram)
+  checkProgramLinking(shaderProgram)
+
+  # Use the program
+  glUseProgram(shaderProgram)
+
   # Create buffers
   const NumElements = 1048576 # 2^20
   const BufferSize = NumElements*sizeof(uint32)
@@ -63,62 +119,7 @@ proc main =
   # Bind the output buffer and allocate memory
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-
-  # Load the compute shader
-  const shaderCode = """
-// J-Y Park et al, https://eprint.iacr.org/2023/1889
-#version 460
-
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-
-const int HALF_ROUNDS = 10 / 2;
-const int KEY_SET_LENGTH = HALF_ROUNDS + 1;
-
-layout(binding = 0) buffer Res0 {
-  uint result[];
-};
-
-uniform uint key_set[KEY_SET_LENGTH];
-uniform int width;
-
-uint rotate_left(uint x, int bits, int width) {
-  return (x << bits) | (x >> (width - bits));
-}
-
-uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], const int width) {
-  const uint mask = (1 << width) - 1;
-  uint t = x;
-  for (int i = 0; i < HALF_ROUNDS; i++) {
-    t = (t + key_set[i]) & mask;
-    t = rotate_left(t, 1, width);
-  }
-  uint y = (t + key_set[HALF_ROUNDS]) & mask;
-  return y;
-}
-
-// Main function to execute compute shader
-void main() {
-  uint id = gl_GlobalInvocationID.x;
-  result[id] = arrhr(id, key_set, width);
-}
-"""
-  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  let shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
-  glCompileShader(shaderModule)
-
-  checkShaderCompilation(shaderModule)
-
-  # Create the shader program
-  var shaderProgram = glCreateProgram()
-  glAttachShader(shaderProgram, shaderModule)
-  glLinkProgram(shaderProgram)
-
-  checkProgramLinking(shaderProgram)
-
-  # Bind the shader storage buffers
-  glUseProgram(shaderProgram)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Generate random keys
   const Rounds = 10
@@ -138,10 +139,8 @@ void main() {
   glUniform1uiv(keySetLocation, KeySetLength, cast[ptr GLuint](addr keySet))
   glUniform1i(widthLocation, Width.GLint)
 
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
-
-  let t0 = cpuTime()
   # Dispatch the compute shader
+  let t0 = cpuTime()
   const numWorkgroupX = ceilDiv(NumElements, workgroupSizeX).GLuint
   glDispatchCompute(numWorkgroupX, 1, 1)
   checkGLerror()

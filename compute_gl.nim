@@ -15,6 +15,22 @@ proc main =
   let versionString = $cast[cstring](glGetString(GL_VERSION))
   echo "OpenGL Version: ", versionString
 
+  # Load the compute shader
+  let shaderCode = readFile("shaders/square.comp")
+  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
+  var shaderCodeCStr = allocCStringArray([shaderCode])
+  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
+  deallocCStringArray(shaderCodeCStr)
+  glCompileShader(shaderModule)
+
+  # Create the shader program
+  var shaderProgram = glCreateProgram()
+  glAttachShader(shaderProgram, shaderModule)
+  glLinkProgram(shaderProgram)
+
+  # Use the program
+  glUseProgram(shaderProgram)
+
   # Create buffers
   const NumElements = 10
   const BufferSize = NumElements*sizeof(int32)
@@ -33,30 +49,14 @@ proc main =
     inBufferPtr[i] = int32(i)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inBuffer)
+
   # Bind the output buffer and allocate memory
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, outBuffer)
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-
-  # Load the compute shader
-  let shaderCode = readFile("shaders/square.comp")
-  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
-  glCompileShader(shaderModule)
-
-  # Create the shader program
-  var shaderProgram = glCreateProgram()
-  glAttachShader(shaderProgram, shaderModule)
-  glLinkProgram(shaderProgram)
-
-  # Bind the shader storage buffers
-  glUseProgram(shaderProgram)
-
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outBuffer)
 
-  # Dispatch the compute shader
+  # Dispatch compute shader
   glDispatchCompute(NumElements, 1, 1)
 
   # Synchronize and read back the results

@@ -88,7 +88,7 @@ proc main() =
   # Initialize input data
   const numElements = 1024
   const workGroupSize = 256
-  const numWorkGroups = ceilDiv(numElements, workGroupSize)
+  const numWorkGroups = numElements div workGroupSize
 
   var inputData: array[numElements, float32]
   for i in 0..<numElements:

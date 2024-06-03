@@ -3,56 +3,7 @@ import opengl, opengl/glut, std/[stats, math]
 const
   workgroupSizeX = 32
 
-proc checkShaderCompilation(shader: GLuint) =
-  var status: GLint
-  glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
-  if status == GL_FALSE.Glint:
-    var len: GLint
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
-    var log = newString(len)
-    glGetShaderInfoLog(shader, length, nil, cstring(log))
-    echo "Shader compilation error: ", log
-
-proc checkProgramLinking(program: GLuint) =
-  var status: GLint
-  glGetProgramiv(program, GL_LINK_STATUS, addr status)
-  if status == GL_FALSE.GLint:
-    var len: GLint
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
-    var log = newString(len)
-    glGetProgramInfoLog(program, length, nil, cstring(log))
-    echo "Program linking error: ", log
-
-proc main =
-  # Create an OpenGL context and window
-  var argc: int32 = 0
-  glutInit(addr argc, nil)
-  glutInitDisplayMode(GLUT_DOUBLE)
-  glutInitWindowSize(640, 480)
-  glutInitWindowPosition(50, 50)
-  discard glutCreateWindow("OpenGL Compute")
-
-  loadExtensions()
-
-  # Get the OpenGL version string
-  let versionString = $cast[cstring](glGetString(GL_VERSION))
-  echo "OpenGL Version: ", versionString
-
-  # Matrix dimensions
-  const NumElements = 100_000
-  # Buffer size for the matrix
-  const BufferSize = NumElements*sizeof(float32)
-
-  # Create buffer
-  var buffer: GLuint
-  glGenBuffers(1, buffer.addr)
-
-  # Bind the output buffer and allocate memory
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-
-  # Load the compute shader
-  let shaderCode = """
+  shaderCode = """
 #version 460
 #extension GL_ARB_gpu_shader_int64 : require
 
@@ -103,6 +54,43 @@ void main() {
   result[id] = tmp;
 }
 """
+
+proc checkShaderCompilation(shader: GLuint) =
+  var status: GLint
+  glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
+  if status == GL_FALSE.Glint:
+    var len: GLint
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
+    var log = newString(len)
+    glGetShaderInfoLog(shader, len, nil, cstring(log))
+    echo "Shader compilation error: ", log
+
+proc checkProgramLinking(program: GLuint) =
+  var status: GLint
+  glGetProgramiv(program, GL_LINK_STATUS, addr status)
+  if status == GL_FALSE.GLint:
+    var len: GLint
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
+    var log = newString(len)
+    glGetProgramInfoLog(program, len, nil, cstring(log))
+    echo "Program linking error: ", log
+
+proc main =
+  # Create an OpenGL context and window
+  var argc: int32 = 0
+  glutInit(addr argc, nil)
+  glutInitDisplayMode(GLUT_DOUBLE)
+  glutInitWindowSize(640, 480)
+  glutInitWindowPosition(50, 50)
+  discard glutCreateWindow("OpenGL Compute")
+
+  loadExtensions()
+
+  # Get the OpenGL version string
+  let versionString = $cast[cstring](glGetString(GL_VERSION))
+  echo "OpenGL Version: ", versionString
+
+  # Load the compute shader
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
   var shaderCodeCStr = allocCStringArray([shaderCode])
   glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
@@ -118,9 +106,23 @@ void main() {
 
   checkProgramLinking(shaderProgram)
 
-  # Bind the shader storage buffers
+  # Use the program
   glUseProgram(shaderProgram)
 
+  # Matrix dimensions
+  const NumElements = 100_000
+  # Buffer size for the matrix
+  const BufferSize = NumElements*sizeof(float32)
+
+  # Create buffer
+  var buffer: GLuint
+  glGenBuffers(1, buffer.addr)
+
+  # Bind the output buffer and allocate memory
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
+  glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+
+  # Bind the shader storage buffers
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Dispatch the compute shader

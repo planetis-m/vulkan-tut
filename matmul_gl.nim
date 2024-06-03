@@ -3,6 +3,43 @@ import opengl, opengl/glut, std/[math, strutils, times, random]
 const
   workgroupSize = (x: 32, y: 32)
 
+  shaderCode = """
+#version 460
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(binding = 0) buffer MatrixA {
+  float dataA[];
+};
+
+layout(binding = 1) buffer MatrixB {
+  float dataB[];
+};
+
+layout(binding = 2) buffer MatrixC {
+  float dataC[];
+};
+
+layout(std140, binding = 3) uniform MatrixSize {
+  uint M; // number of rows in A and C
+  uint N; // number of columns in A and rows in B
+  uint P; // number of columns in B and C
+};
+
+void main() {
+  uint row = gl_GlobalInvocationID.x;
+  uint col = gl_GlobalInvocationID.y;
+  if (row >= M || col >= P) {
+    return;
+  }
+  float sum = 0.0;
+  for (uint k = 0; k < N; ++k) {
+    sum += dataA[row * N + k] * dataB[k * P + col];
+  }
+  dataC[row * P + col] = sum;
+}
+"""
+
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
   glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
@@ -54,6 +91,25 @@ proc main =
   let versionString = $cast[cstring](glGetString(GL_VERSION))
   echo "OpenGL Version: ", versionString
 
+  # Load the compute shader
+  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
+  var shaderCodeCStr = allocCStringArray([shaderCode])
+  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
+  deallocCStringArray(shaderCodeCStr)
+  glCompileShader(shaderModule)
+
+  checkShaderCompilation(shaderModule)
+
+  # Create the shader program
+  var shaderProgram = glCreateProgram()
+  glAttachShader(shaderProgram, shaderModule)
+  glLinkProgram(shaderProgram)
+
+  checkProgramLinking(shaderProgram)
+
+  # Use the program
+  glUseProgram(shaderProgram)
+
   # Matrix dimensions
   const M = 1024
   const N = 2048
@@ -77,6 +133,7 @@ proc main =
   for i in 0 ..< M * N:
     bufferAPtr[i] = float32(i + 1)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, bufferA)
 
   # Bind and initialize buffer B
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferB)
@@ -85,10 +142,12 @@ proc main =
   for i in 0 ..< N * P:
     bufferBPtr[i] = float32(i + 1)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bufferB)
 
   # Bind and initialize buffer C (output)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferC)
   glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSizeC.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bufferC)
 
   # Uniform buffer for matrix dimensions
   var uniformBuffer: GLuint
@@ -102,67 +161,8 @@ proc main =
   discard glUnmapBuffer(GL_UNIFORM_BUFFER)
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, uniformBuffer)
 
-  # Load the compute shader
-  const shaderCode = """
-#version 460
-
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-
-layout(binding = 0) buffer MatrixA {
-  float dataA[];
-};
-
-layout(binding = 1) buffer MatrixB {
-  float dataB[];
-};
-
-layout(binding = 2) buffer MatrixC {
-  float dataC[];
-};
-
-layout(std140, binding = 3) uniform MatrixSize {
-  uint M; // number of rows in A and C
-  uint N; // number of columns in A and rows in B
-  uint P; // number of columns in B and C
-};
-
-void main() {
-  uint row = gl_GlobalInvocationID.x;
-  uint col = gl_GlobalInvocationID.y;
-  if (row >= M || col >= P) {
-    return;
-  }
-  float sum = 0.0;
-  for (uint k = 0; k < N; ++k) {
-    sum += dataA[row * N + k] * dataB[k * P + col];
-  }
-  dataC[row * P + col] = sum;
-}
-"""
-  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
-  glCompileShader(shaderModule)
-
-  checkShaderCompilation(shaderModule)
-
-  # Create the shader program
-  var shaderProgram = glCreateProgram()
-  glAttachShader(shaderProgram, shaderModule)
-  glLinkProgram(shaderProgram)
-
-  checkProgramLinking(shaderProgram)
-
-  # Bind the shader storage buffers
-  glUseProgram(shaderProgram)
-
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, bufferA)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bufferB)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bufferC)
-
-  let t0 = cpuTime()
   # Dispatch the compute shader
+  let t0 = cpuTime()
   glDispatchCompute(ceilDiv(M, workgroupSize.x).GLuint, ceilDiv(P, workgroupSize.y).GLuint, 1)
 
   # Synchronize and read back the results
