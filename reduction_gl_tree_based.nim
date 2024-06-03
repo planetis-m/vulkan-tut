@@ -5,7 +5,7 @@ const
   NumElements = 1024
   NumWorkGroups = NumElements div WorkGroupSize
 
-  ShaderCode = format("""
+  FirstReductionShaderCode = format("""
 #version 460
 
 layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
@@ -42,6 +42,42 @@ void main() {
   }
 }
 """, WorkGroupSize)
+
+  FinalReductionShaderCode = format("""
+#version 460
+
+layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
+
+shared float sharedData[$1];
+
+layout(binding = 1) buffer OutputBuffer {
+  float outputData[];
+};
+
+void main() {
+  uint localIdx = gl_LocalInvocationID.x;
+  uint globalIdx = gl_GlobalInvocationID.x;
+  uint localSize = gl_WorkGroupSize.x;
+
+  if (globalIdx < $2) {
+    sharedData[localIdx] = outputData[globalIdx];
+  } else {
+    sharedData[localIdx] = 0.0;
+  }
+  barrier();
+
+  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
+    if (localIdx < stride) {
+      sharedData[localIdx] += sharedData[localIdx + stride];
+    }
+    barrier();
+  }
+
+  if (localIdx == 0) {
+    outputData[0] = sharedData[0];
+  }
+}
+""", WorkGroupSize, NumWorkGroups)
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -92,14 +128,15 @@ proc createGPUBuffer(target: GLenum, size: GLsizeiptr, data: pointer, usage: GLe
 
 type
   Reduction = object
-    program: GLuint
-    inputputBuffer: GLuint
+    firstReductionProgram, finalReductionProgram: GLuint
+    inputBuffer: GLuint
     outputBuffer: GLuint
 
 proc cleanup(x: Reduction) =
-  glDeleteBuffers(1, addr x.inputputBuffer)
+  glDeleteBuffers(1, addr x.inputBuffer)
   glDeleteBuffers(1, addr x.outputBuffer)
-  glDeleteProgram(x.program)
+  glDeleteProgram(x.finalReductionProgram)
+  glDeleteProgram(x.firstReductionProgram)
 
 proc main() =
   var x: Reduction
@@ -115,21 +152,25 @@ proc main() =
     loadExtensions()
 
     # Create and compile the compute shader
-    x.program = createComputeProgram(ShaderCode.cstring)
+    x.firstReductionProgram = createComputeProgram(FirstReductionShaderCode.cstring)
+    x.finalReductionProgram = createComputeProgram(FinalReductionShaderCode.cstring)
 
-    # Use the program
-    glUseProgram(x.program)
+    # Use the firstReductionProgram reduction program
+    glUseProgram(x.firstReductionProgram)
 
     # Generate and bind SSBOs
-    x.inputputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32),
+    x.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32),
         nil, GL_STATIC_DRAW)
 
-    let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+    let inputDataPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
     for i in 0..<NumElements:
       inputDataPtr[i] = float32(i + 1)
     discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, x.inputputBuffer)
+    # Use the firstReductionProgram reduction program
+    glUseProgram(x.firstReductionProgram)
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, x.inputBuffer)
 
     # Output buffer
     x.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32),
@@ -142,14 +183,17 @@ proc main() =
     # Ensure all work is done
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-    # Read back the results
-    let outputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-    var result: float32 = 0
-    for i in 0 ..< NumWorkGroups:
-      result += outputDataPtr[i]
-    discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+    # Use the finalReductionProgram reduction program
+    glUseProgram(x.finalReductionProgram)
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, x.outputBuffer)
 
+    glDispatchCompute(1, 1, 1)
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+
+    var result: float32 = 0
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float32), addr result)
     echo("Final reduction result: ", result)
+
   finally:
     cleanup(x)
 
