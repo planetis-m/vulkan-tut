@@ -28,28 +28,28 @@ proc main =
   glAttachShader(shaderProgram, shaderModule)
   glLinkProgram(shaderProgram)
 
-  # Use the program
-  glUseProgram(shaderProgram)
+  # # Use the program
+  # glUseProgram(shaderProgram)
 
   # Create buffers
   const NumElements = 10
   const BufferSize = NumElements*sizeof(int32)
 
-  var inBuffer, outBuffer: GLuint
-  glGenBuffers(1, inBuffer.addr)
+  var inpBuffer, outBuffer: GLuint
+  glGenBuffers(1, inpBuffer.addr)
   glGenBuffers(1, outBuffer.addr)
 
   # Bind the input buffer and allocate memory
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, inBuffer)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, inpBuffer)
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
 
   # Map the input buffer and write data
-  var inBufferPtr = cast[ptr array[NumElements, int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  var inpBufferPtr = cast[ptr array[NumElements, int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0 ..< NumElements:
-    inBufferPtr[i] = int32(i)
+    inpBufferPtr[i] = int32(i)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inpBuffer)
 
   # Bind the output buffer and allocate memory
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, outBuffer)
@@ -69,7 +69,7 @@ proc main =
   # Clean up
   glDeleteProgram(shaderProgram)
   glDeleteShader(shaderModule)
-  glDeleteBuffers(1, inBuffer.addr)
+  glDeleteBuffers(1, inpBuffer.addr)
   glDeleteBuffers(1, outBuffer.addr)
 
 main()

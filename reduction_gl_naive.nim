@@ -2,7 +2,7 @@ import opengl, opengl/glut
 import std/[math, strutils, os, sequtils]
 
 const
-  shaderCode = """
+  ShaderCode = """
 #version 460
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
@@ -48,7 +48,7 @@ proc checkShaderCompilation(shader: GLuint) =
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetShaderInfoLog(shader, len, nil, cstring(log))
-    echo "Shader compilation error: ", log
+    raise newException(GLerror, "Shader compilation error: " & log)
 
 proc checkProgramLinking(program: GLuint) =
   var status: GLint
@@ -58,77 +58,102 @@ proc checkProgramLinking(program: GLuint) =
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetProgramInfoLog(program, len, nil, cstring(log))
-    echo "Program linking error: ", log
+    raise newException(GLerror, "Program linking error: " & log)
+
+proc loadShader(shaderType: GLenum, source: cstring): GLuint =
+  # Create and compile the compute shader
+  result = glCreateShader(shaderType)
+  if result != 0.GLUint:
+    glShaderSource(result, 1, cast[cstringArray](addr source), nil)
+    glCompileShader(result)
+    checkShaderCompilation(result)
+
+proc createComputeProgram(computeSource: cstring): GLuint =
+  let module = loadShader(GL_COMPUTE_SHADER, computeSource)
+  if module != 0.GLUint:
+    try:
+      result = glCreateProgram()
+      # Create the shader program and link the compute shader
+      if result != 0.GLUint:
+        glAttachShader(result, module)
+        glLinkProgram(result)
+        checkProgramLinking(result)
+    finally:
+      glDeleteShader(module)
+
+proc createGPUBuffer(target: GLenum, size: GLsizeiptr, data: pointer, usage: GLenum): GLuint =
+  glGenBuffers(1, addr result)
+  glBindBuffer(target, result)
+  glBufferData(target, size, data, usage)
+  checkGLerror()
+
+type
+  Reduction = object
+    program: GLuint
+    inpBuffer: GLuint
+    outBuffer: GLuint
+
+proc cleanup(x: Reduction) =
+  glDeleteBuffers(1, addr x.inpBuffer)
+  glDeleteBuffers(1, addr x.outBuffer)
+  glDeleteProgram(x.program)
 
 proc main() =
-  # Create an OpenGL context and window
-  var argc: int32 = 0
-  glutInit(addr argc, nil)
-  glutInitDisplayMode(GLUT_DOUBLE)
-  glutInitWindowSize(640, 480)
-  glutInitWindowPosition(50, 50)
-  discard glutCreateWindow("OpenGL Compute")
+  var x: Reduction
+  try:
+    # Create an OpenGL context and window
+    var argc: int32 = 0
+    glutInit(addr argc, nil)
+    glutInitDisplayMode(GLUT_DOUBLE)
+    glutInitWindowSize(640, 480)
+    glutInitWindowPosition(50, 50)
+    discard glutCreateWindow("OpenGL Compute")
 
-  loadExtensions()
+    loadExtensions()
 
-  # Create and compile the compute shader
-  let module = glCreateShader(GL_COMPUTE_SHADER)
-  let shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(module, 1, shaderCodeCstr, nil)
-  deallocCStringArray(shaderCodeCStr)
-  glCompileShader(module)
-  checkShaderCompilation(module)
+    # Create and compile the compute shader
+    x.program = createComputeProgram(ShaderCode.cstring)
 
-  # Create the shader program and link the compute shader
-  let program = glCreateProgram()
-  glAttachShader(program, module)
-  glLinkProgram(program)
-  checkProgramLinking(program)
+    # Use the program
+    glUseProgram(x.program)
 
-  # Initialize input data
-  const numElements = 1024
-  const workGroupSize = 256
-  const numWorkGroups = numElements div workGroupSize
+    # Initialize input data
+    const numElements = 1024
+    const workGroupSize = 256
+    const numWorkGroups = numElements div workGroupSize
 
-  var inputData: array[numElements, float32]
-  for i in 0..<numElements:
-    inputData[i] = float32(i + 1)
+    var inpData: array[numElements, float32]
+    for i in 0..<numElements:
+      inpData[i] = float32(i + 1)
 
-  # Generate and bind SSBOs
-  var ssbo: array[2, GLuint]
-  glGenBuffers(2, addr ssbo[0])
+    # Generate and bind SSBOs
+    # Input buffer
+    x.inpBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, numElements*sizeof(float32),
+        addr inpData[0], GL_STATIC_DRAW)
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, x.inpBuffer)
 
-  # Input buffer
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[0])
-  glBufferData(GL_SHADER_STORAGE_BUFFER, numElements*sizeof(float32), addr inputData[0], GL_STATIC_DRAW)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[0])
+    # Output buffer
+    x.outBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, numWorkGroups*sizeof(float32),
+        nil, GL_STATIC_DRAW)
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, x.outBuffer)
 
-  # Output buffer
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[1])
-  glBufferData(GL_SHADER_STORAGE_BUFFER, numWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo[1])
+    # dispatch compute shader
+    glDispatchCompute(numWorkGroups.GLuint, 1, 1)
 
-  # Use the program and dispatch compute shader
-  glUseProgram(program)
-  glDispatchCompute(numWorkGroups.GLuint, 1, 1)
+    # Ensure all work is done
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-  # Ensure all work is done
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+    # Read back the results
+    var outData: array[numWorkGroups, float32]
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numWorkGroups*sizeof(float32), addr outData[0])
 
-  # Read back the results
-  var outputData: array[numWorkGroups, float32]
-  glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numWorkGroups*sizeof(float32), addr outputData[0])
+    # Perform final reduction on the CPU if necessary
+    var result: float32 = 0
+    for i in 0 ..< numWorkGroups:
+      result = result + outData[i]
+    echo("Final reduction result: ", result)
 
-  # Perform final reduction on the CPU if necessary
-  var result: float32 = 0
-  for i in 0 ..< numWorkGroups:
-    result = result + outputData[i]
-
-  echo("Final reduction result: ", result)
-
-  # Clean up
-  glDeleteProgram(program)
-  glDeleteShader(module)
-  glDeleteBuffers(2, addr ssbo[0])
+  finally:
+    cleanup(x)
 
 main()
