@@ -162,7 +162,7 @@ proc main() =
     x.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32),
         nil, GL_STATIC_DRAW)
 
-    let inputDataPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+    let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
     for i in 0..<NumElements:
       inputDataPtr[i] = float32(i + 1)
     discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
