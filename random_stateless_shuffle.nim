@@ -7,31 +7,21 @@ proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
   glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
   if status == GL_FALSE.Glint:
-    var length: GLint
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr length)
-    if length > 0:
-      var log = newString(length)
-      glGetShaderInfoLog(shader, length, nil, cstring(log))
-      echo "Shader compilation error: ", log
-    else:
-      echo "Unknown shader compilation error"
-  else:
-    echo "Shader compiled successfully"
+    var len: GLint
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
+    var log = newString(len)
+    glGetShaderInfoLog(shader, length, nil, cstring(log))
+    echo "Shader compilation error: ", log
 
 proc checkProgramLinking(program: GLuint) =
   var status: GLint
   glGetProgramiv(program, GL_LINK_STATUS, addr status)
   if status == GL_FALSE.GLint:
-    var length: GLint
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr length)
-    if length > 0:
-      var log = newString(length)
-      glGetProgramInfoLog(program, length, nil, cstring(log))
-      echo "Program linking error: ", log
-    else:
-      echo "Unknown program linking error"
-  else:
-    echo "Program linked successfully"
+    var len: GLint
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
+    var log = newString(len)
+    glGetProgramInfoLog(program, length, nil, cstring(log))
+    echo "Program linking error: ", log
 
 proc generateRandomKeys(keys: var openarray[uint32], mask: uint32) =
   for i in 0..keys.high:

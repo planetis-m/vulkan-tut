@@ -44,21 +44,21 @@ proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
   glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
   if status == GL_FALSE.Glint:
-    var length: GLint
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr length)
-    var infoLog = newString(length)
-    glGetShaderInfoLog(shader, length, nil, infoLog.cstring)
-    quit "Shader compilation error: " & infoLog
+    var len: GLint
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
+    var log = newString(len)
+    glGetShaderInfoLog(shader, length, nil, cstring(log))
+    echo "Shader compilation error: ", log
 
 proc checkProgramLinking(program: GLuint) =
   var status: GLint
   glGetProgramiv(program, GL_LINK_STATUS, addr status)
-  if status == GL_FALSE.Glint:
-    var length: GLint
-    glGetShaderiv(program, GL_INFO_LOG_LENGTH, addr length)
-    var infoLog = newString(length)
-    glGetProgramInfoLog(program, length, nil, infoLog.cstring)
-    quit "Program linking error: " & infoLog
+  if status == GL_FALSE.GLint:
+    var len: GLint
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
+    var log = newString(len)
+    glGetProgramInfoLog(program, length, nil, cstring(log))
+    echo "Program linking error: ", log
 
 proc main() =
   # Create an OpenGL context and window
