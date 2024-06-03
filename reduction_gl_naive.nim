@@ -47,7 +47,7 @@ proc checkShaderCompilation(shader: GLuint) =
     var len: GLint
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
-    glGetShaderInfoLog(shader, length, nil, cstring(log))
+    glGetShaderInfoLog(shader, len, nil, cstring(log))
     echo "Shader compilation error: ", log
 
 proc checkProgramLinking(program: GLuint) =
@@ -57,7 +57,7 @@ proc checkProgramLinking(program: GLuint) =
     var len: GLint
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
-    glGetProgramInfoLog(program, length, nil, cstring(log))
+    glGetProgramInfoLog(program, len, nil, cstring(log))
     echo "Program linking error: ", log
 
 proc main() =
@@ -72,16 +72,16 @@ proc main() =
   loadExtensions()
 
   # Create and compile the compute shader
-  let computeShader = glCreateShader(GL_COMPUTE_SHADER)
+  let module = glCreateShader(GL_COMPUTE_SHADER)
   let shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(computeShader, 1, shaderCodeCstr, nil)
+  glShaderSource(module, 1, shaderCodeCstr, nil)
   deallocCStringArray(shaderCodeCStr)
-  glCompileShader(computeShader)
-  checkShaderCompilation(computeShader)
+  glCompileShader(module)
+  checkShaderCompilation(module)
 
   # Create the shader program and link the compute shader
   let program = glCreateProgram()
-  glAttachShader(program, computeShader)
+  glAttachShader(program, module)
   glLinkProgram(program)
   checkProgramLinking(program)
 
@@ -125,5 +125,10 @@ proc main() =
     result = result + outputData[i]
 
   echo("Final reduction result: ", result)
+
+  # Clean up
+  glDeleteProgram(program)
+  glDeleteShader(module)
+  glDeleteBuffers(2, addr ssbo[0])
 
 main()

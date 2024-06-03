@@ -10,7 +10,7 @@ proc checkShaderCompilation(shader: GLuint) =
     var len: GLint
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
-    glGetShaderInfoLog(shader, length, nil, cstring(log))
+    glGetShaderInfoLog(shader, len, nil, cstring(log))
     echo "Shader compilation error: ", log
 
 proc checkProgramLinking(program: GLuint) =
@@ -20,7 +20,7 @@ proc checkProgramLinking(program: GLuint) =
     var len: GLint
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
-    glGetProgramInfoLog(program, length, nil, cstring(log))
+    glGetProgramInfoLog(program, len, nil, cstring(log))
     echo "Program linking error: ", log
 
 proc main =
