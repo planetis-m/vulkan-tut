@@ -2,10 +2,10 @@ import opengl, opengl/glut, std/strutils
 
 const
   WorkGroupSize = 256
-  NumElements = 294912
+  NumElements = 65536
   NumWorkGroups = NumElements div WorkGroupSize
 
-  FirstReductionShaderCode = format("""
+  ShaderCode = """
 #version 460
 
 layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
@@ -41,43 +41,7 @@ void main() {
     outputData[gl_WorkGroupID.x] = sharedData[0];
   }
 }
-""", WorkGroupSize)
-
-  FinalReductionShaderCode = format("""
-#version 460
-
-layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
-
-shared float sharedData[$1];
-
-layout(binding = 1) buffer OutputBuffer {
-  float outputData[];
-};
-
-void main() {
-  uint localIdx = gl_LocalInvocationID.x;
-  uint globalIdx = gl_GlobalInvocationID.x;
-  uint localSize = gl_WorkGroupSize.x;
-
-  if (globalIdx < $2) {
-    sharedData[localIdx] = outputData[globalIdx];
-  } else {
-    sharedData[localIdx] = 0.0;
-  }
-  barrier();
-
-  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
-    if (localIdx < stride) {
-      sharedData[localIdx] += sharedData[localIdx + stride];
-    }
-    barrier();
-  }
-
-  if (localIdx == 0) {
-    outputData[0] = sharedData[0];
-  }
-}
-""", WorkGroupSize, NumWorkGroups)
+"""
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -151,14 +115,14 @@ proc initOpenGLContext() =
 
 proc initResources(): Reduction =
   # Create and compile the compute shader
-  result.firstReductionProgram = createComputeProgram(FirstReductionShaderCode.cstring)
-  result.finalReductionProgram = createComputeProgram(FinalReductionShaderCode.cstring)
+  result.firstReductionProgram = createComputeProgram(format(ShaderCode, WorkGroupSize).cstring)
+  result.finalReductionProgram = createComputeProgram(format(ShaderCode, NumWorkGroups).cstring)
   # Input buffer
   result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
   let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
-    inputDataPtr[i] = float32(i + 1)
+    inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)

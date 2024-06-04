@@ -119,7 +119,7 @@ proc initResources(): Reduction =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
   let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
-    inputDataPtr[i] = float32(i + 1)
+    inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
