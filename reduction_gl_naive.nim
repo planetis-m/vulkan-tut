@@ -2,9 +2,11 @@ import opengl, opengl/glut, std/[strutils, times]
 
 const
   WorkGroupSize = 256
-  NumElements = 262144
-  NumWorkGroups = NumElements div WorkGroupSize
+  NumElements = 1048576
+  NumElementsPerThread = 1024
+  NumWorkGroups = NumElements div NumElementsPerThread div WorkGroupSize
 
+const
   ShaderCode = format("""
 #version 460
 
@@ -20,20 +22,26 @@ layout(binding = 1) buffer OutputBuffer {
   float outputData[];
 };
 
+uniform uint n;
+
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
-  uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
+  uint globalIdx = gl_WorkGroupID.x * (localSize * 2) + localIdx;
+  uint gridSize = localSize * 2 * gl_NumWorkGroups.x;
 
-  sharedData[localIdx] = inputData[globalIdx];
+  sharedData[localIdx] = 0;
+  while (globalIdx < n) {
+    sharedData[localIdx] += inputData[globalIdx] + inputData[globalIdx + localSize];
+    globalIdx += gridSize;
+  }
   barrier();
 
-  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
     memoryBarrierShared();
-    //barrier();
   }
 
   // Final reduction within each subgroup
@@ -147,6 +155,9 @@ proc dispatchComputeShader(resources: Reduction) =
   # Bind the shader storage buffers
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
+  # Get the location of the uniform variable and set it
+  let nLoc = glGetUniformLocation(resources.program, "n")
+  glUniform1ui(nLoc, NumElementsPerThread)
   # Dispatch the compute shader
   glDispatchCompute(NumWorkGroups, 1, 1)
   # Ensure all work is done
