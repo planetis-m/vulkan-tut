@@ -2,7 +2,7 @@ import opengl, opengl/glut, std/strutils
 
 const
   WorkGroupSize = 256
-  NumElements = 1048576
+  NumElements = 262144
   NumWorkGroups = NumElements div WorkGroupSize
 
   ShaderCode = format("""
@@ -25,16 +25,25 @@ void main() {
   uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
 
-  uint stride = localSize / 2;
-  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + stride];
+  sharedData[localIdx] = inputData[globalIdx];
   barrier();
 
-  stride >>= 1;
-  for (; stride > 0; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
     barrier();
+  }
+
+  // Final reduction within each subgroup
+  if (localIdx < 64) {
+    sharedData[localIdx] += sharedData[localIdx + 64];
+    sharedData[localIdx] += sharedData[localIdx + 32];
+    sharedData[localIdx] += sharedData[localIdx + 16];
+    sharedData[localIdx] += sharedData[localIdx + 8];
+    sharedData[localIdx] += sharedData[localIdx + 4];
+    sharedData[localIdx] += sharedData[localIdx + 2];
+    sharedData[localIdx] += sharedData[localIdx + 1];
   }
 
   if (localIdx == 0) {
