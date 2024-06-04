@@ -2,7 +2,7 @@ import opengl, opengl/glut, std/strutils
 
 const
   WorkGroupSize = 256
-  NumElements = 65536
+  NumElements = 262144 # Max problem size when MAX_COMPUTE_WORK_GROUP_SIZE (1024)
   NumWorkGroups = NumElements div WorkGroupSize
 
   ShaderCode = """
@@ -25,12 +25,10 @@ void main() {
   uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
 
-  uint stride = localSize / 2;
-  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + stride];
+  sharedData[localIdx] = inputData[globalIdx];
   barrier();
 
-  stride >>= 1;
-  for (; stride > 0; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
@@ -96,10 +94,12 @@ type
     finalReductionProgram: GLuint
     inputBuffer: GLuint
     outputBuffer: GLuint
+    resultBuffer: GLuint
 
 proc cleanup(x: Reduction) =
   glDeleteBuffers(1, addr x.inputBuffer)
   glDeleteBuffers(1, addr x.outputBuffer)
+  glDeleteBuffers(1, addr x.resultBuffer)
   glDeleteProgram(x.finalReductionProgram)
   glDeleteProgram(x.firstReductionProgram)
 
@@ -126,6 +126,8 @@ proc initResources(): Reduction =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
+  # Final result buffer
+  result.resultBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(float32), nil, GL_STATIC_DRAW)
 
 proc performFirstReduction(resources: Reduction) =
   # Use the program
@@ -142,7 +144,8 @@ proc performFinalReduction(resources: Reduction) =
   # Use the program
   glUseProgram(resources.finalReductionProgram)
   # Bind the shader storage buffer
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.outputBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.resultBuffer)
   # Dispatch the compute shader
   glDispatchCompute(1, 1, 1)
   # Ensure all work is done
@@ -161,7 +164,7 @@ proc main() =
     resources = initResources()
     performFirstReduction(resources)
     performFinalReduction(resources)
-    let result = readResult(resources.outputBuffer)
+    let result = readResult(resources.resultBuffer)
     echo("Final reduction result: ", result)
   finally:
     cleanup(resources)
