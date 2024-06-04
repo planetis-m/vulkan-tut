@@ -1,8 +1,8 @@
-import opengl, opengl/glut, std/strutils
+import opengl, opengl/glut, std/[strutils, times]
 
 const
   WorkGroupSize = 256
-  NumElements = 1048576
+  NumElements = 262144
   NumWorkGroups = NumElements div WorkGroupSize
 
   ShaderCode = format("""
@@ -144,14 +144,20 @@ proc readResults(outputBuffer: GLuint): float32 =
     result += outputDataPtr[i]
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
+template ff(f: float, prec: int = 4): string =
+  formatFloat(f*1000, ffDecimal, prec) # ms
+
 proc main() =
   var resources: Reduction
   try:
     initOpenGLContext()
     resources = initResources()
+    let start = cpuTime()
     dispatchComputeShader(resources)
     let result = readResults(resources.outputBuffer)
-    echo("Final reduction result: ", result)
+    let duration = cpuTime() - start
+    echo "Final reduction result: ", result
+    echo "Runtime: ", ff(duration)
   finally:
     cleanup(resources)
 

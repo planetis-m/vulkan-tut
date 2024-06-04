@@ -1,4 +1,4 @@
-import opengl, opengl/glut, std/strutils
+import opengl, opengl/glut, std/[strutils, times]
 
 const
   WorkGroupSize = 256
@@ -159,15 +159,21 @@ proc readResult(outputBuffer: GLuint): float32 =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer)
   glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float32), addr result)
 
+template ff(f: float, prec: int = 4): string =
+  formatFloat(f*1000, ffDecimal, prec) # ms
+
 proc main() =
   var resources: Reduction
   try:
     initOpenGLContext()
     resources = initResources()
+    let start = cpuTime()
     performFirstReduction(resources)
     performFinalReduction(resources)
+    let duration = cpuTime()
     let result = readResult(resources.resultBuffer)
-    echo("Final reduction result: ", result)
+    echo "Final reduction result: ", result
+    echo "Runtime: ", ff(duration)
   finally:
     cleanup(resources)
 
