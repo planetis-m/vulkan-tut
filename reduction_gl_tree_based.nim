@@ -22,15 +22,13 @@ layout(binding = 1) buffer OutputBuffer {
 
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
-  uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
+  uint globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx;
 
-  uint stride = localSize / 2;
-  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + stride];
+  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + localSize];
   barrier();
 
-  stride >>= 1;
-  for (; stride > 0; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
