@@ -25,10 +25,12 @@ void main() {
   uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
 
-  sharedData[localIdx] = inputData[globalIdx];
+  uint stride = localSize / 2;
+  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + stride];
   barrier();
 
-  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
+  stride >>= 1;
+  for (; stride > 0; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }

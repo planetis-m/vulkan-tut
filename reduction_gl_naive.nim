@@ -2,7 +2,7 @@ import opengl, opengl/glut, std/strutils
 
 const
   WorkGroupSize = 256
-  NumElements = 262144
+  NumElements = 1048576
   NumWorkGroups = NumElements div WorkGroupSize
 
   ShaderCode = format("""
@@ -25,25 +25,16 @@ void main() {
   uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
 
-  sharedData[localIdx] = inputData[globalIdx];
+  uint stride = localSize / 2;
+  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + stride];
   barrier();
 
-  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
+  stride >>= 1;
+  for (; stride > 0; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
     barrier();
-  }
-
-  // Final reduction within each subgroup
-  if (localIdx < 64) {
-    sharedData[localIdx] += sharedData[localIdx + 64];
-    sharedData[localIdx] += sharedData[localIdx + 32];
-    sharedData[localIdx] += sharedData[localIdx + 16];
-    sharedData[localIdx] += sharedData[localIdx + 8];
-    sharedData[localIdx] += sharedData[localIdx + 4];
-    sharedData[localIdx] += sharedData[localIdx + 2];
-    sharedData[localIdx] += sharedData[localIdx + 1];
   }
 
   if (localIdx == 0) {
@@ -128,7 +119,7 @@ proc initResources(): Reduction =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
   let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
-    inputDataPtr[i] = 1
+    inputDataPtr[i] = float32(i + 1)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
