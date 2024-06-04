@@ -2,7 +2,7 @@ import opengl, opengl/glut, std/strutils
 
 const
   WorkGroupSize = 256
-  NumElements = 1024
+  NumElements = 1048576
   NumWorkGroups = NumElements div WorkGroupSize
 
   ShaderCode = format("""
@@ -111,29 +111,25 @@ proc initOpenGLContext() =
   discard glutCreateWindow("OpenGL Compute")
   loadExtensions()
 
-proc createAndInitResources(): Reduction =
+proc initResources(): Reduction =
   # Create and compile the compute shader
   result.program = createComputeProgram(ShaderCode.cstring)
-
-  # Use the program
-  glUseProgram(result.program)
-
   # Input buffer
   result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
-
   let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
     inputDataPtr[i] = float32(i + 1)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
-
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, result.inputBuffer)
-
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, result.outputBuffer)
 
-proc dispatchComputeShader() =
+proc dispatchComputeShader(resources: Reduction) =
+  # Use the program
+  glUseProgram(resources.program)
+  # Bind the shader storage buffers
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
   # Dispatch the compute shader
   glDispatchCompute(NumWorkGroups, 1, 1)
   # Ensure all work is done
@@ -143,7 +139,6 @@ proc readResults(outputBuffer: GLuint): float32 =
   # Read back the results
   result = 0
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer)
-
   let outputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   for i in 0..<NumWorkGroups:
     result += outputDataPtr[i]
@@ -153,8 +148,8 @@ proc main() =
   var resources: Reduction
   try:
     initOpenGLContext()
-    resources = createAndInitResources()
-    dispatchComputeShader()
+    resources = initResources()
+    dispatchComputeShader(resources)
     let result = readResults(resources.outputBuffer)
     echo("Final reduction result: ", result)
   finally:
