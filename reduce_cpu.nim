@@ -1,3 +1,27 @@
+# ChatGPT generated, prompt:
+# Let's make a small program that would simulate running a "compute shader"
+# written in pure nim on the cpu. I have a small template to get started:
+#
+# ```nim
+# type
+#   UVec3 = object
+#     x, y, z: uint32
+#
+# var gl_GlobalInvocationID*: UVec3
+#
+# proc runComputeOnCpu(computeShader: proc(), invocationSize: UVec3) =
+#   for z in 0 ..< invocationSize.z:
+#     for y in 0 ..< invocationSize.y:
+#       for x in 0 ..< invocationSize.x:
+#         gl_GlobalInvocationID = uvec3(x, y, z)
+#         computeShader()
+# ```
+#
+# But a lot of OpenGL compute stuff are missing such as globals for
+# gl_WorkGroupSize, gl_WorkGroupID, gl_NumWorkGroups, gl_LocalInvocationID, etc.
+# Please create the simulated environment to run a fake compute shader and write
+# an example reduction shader.
+
 type
   UVec3 = object
     x, y, z: uint32
