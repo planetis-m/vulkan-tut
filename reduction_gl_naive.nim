@@ -25,16 +25,33 @@ void main() {
   uint globalIdx = gl_GlobalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
 
-  uint stride = localSize / 2;
-  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + stride];
+  sharedData[localIdx] = inputData[globalIdx];
   barrier();
 
-  stride >>= 1;
-  for (; stride > 0; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
-    barrier();
+    memoryBarrierShared();
+    //barrier();
+  }
+
+  // Final reduction within each subgroup
+  if (localIdx < 64) {
+    sharedData[localIdx] += sharedData[localIdx + 64];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 32];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 16];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 8];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 4];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 2];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 1];
+    memoryBarrierShared();
   }
 
   if (localIdx == 0) {
@@ -119,7 +136,7 @@ proc initResources(): Reduction =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
   let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
-    inputDataPtr[i] = float32(i + 1)
+    inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
