@@ -3,11 +3,10 @@ import opengl, opengl/glut, std/[strutils, times]
 const
   WorkGroupSize = 256
   NumElements = 1048576
-  NumElementsPerThread = 1024
-  NumWorkGroups = NumElements div NumElementsPerThread div WorkGroupSize
+  NumWorkGroups = NumElements div (WorkGroupSize * 2)
 
-const
   ShaderCode = format("""
+// https://github.com/hsaputra/cuda_training
 #version 460
 
 layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
@@ -27,38 +26,48 @@ uniform uint n;
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
-  uint globalIdx = gl_WorkGroupID.x * (localSize * 2) + localIdx;
+  uint globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx;
   uint gridSize = localSize * 2 * gl_NumWorkGroups.x;
 
-  sharedData[localIdx] = 0;
+  float sum = 0;
   while (globalIdx < n) {
-    sharedData[localIdx] += inputData[globalIdx] + inputData[globalIdx + localSize];
+    sum += inputData[globalIdx] + inputData[globalIdx + localSize];
+    inputData[globalIdx] = sum;
     globalIdx += gridSize;
   }
+  sharedData[localIdx] = sum;
   barrier();
 
   for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
     if (localIdx < stride) {
-      sharedData[localIdx] += sharedData[localIdx + stride];
+      sum += sharedData[localIdx + stride];
+      sharedData[localIdx] = sum;
     }
     memoryBarrierShared();
   }
 
   // Final reduction within each subgroup
   if (localIdx < 64) {
-    sharedData[localIdx] += sharedData[localIdx + 64];
+    sum += sharedData[localIdx + 64];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 32];
+    sum += sharedData[localIdx + 32];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 16];
+    sum += sharedData[localIdx + 16];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 8];
+    sum += sharedData[localIdx + 8];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 4];
+    sum += sharedData[localIdx + 4];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 2];
+    sum += sharedData[localIdx + 2];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 1];
+    sum += sharedData[localIdx + 1];
+    sharedData[localIdx] = sum;
     memoryBarrierShared();
   }
 
@@ -157,16 +166,16 @@ proc dispatchComputeShader(resources: Reduction) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
   # Get the location of the uniform variable and set it
   let nLoc = glGetUniformLocation(resources.program, "n")
-  glUniform1ui(nLoc, NumElementsPerThread)
+  glUniform1ui(nLoc, NumElements)
   # Dispatch the compute shader
   glDispatchCompute(NumWorkGroups, 1, 1)
   # Ensure all work is done
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-proc readResults(outputBuffer: GLuint): float32 =
+proc readResults(resources: Reduction): float32 =
   # Read back the results
   result = 0
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.outputBuffer)
   let outputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   for i in 0..<NumWorkGroups:
     result += outputDataPtr[i]
@@ -182,7 +191,7 @@ proc main() =
     resources = initResources()
     let start = cpuTime()
     dispatchComputeShader(resources)
-    let result = readResults(resources.outputBuffer)
+    let result = readResults(resources)
     let duration = cpuTime() - start
     echo "Final reduction result: ", result
     echo "Runtime: ", ff(duration)
