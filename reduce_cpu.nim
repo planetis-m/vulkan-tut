@@ -1,26 +1,5 @@
-# ChatGPT generated, prompt:
-# Let's make a small program that would simulate running a "compute shader"
-# written in pure nim on the cpu. I have a small template to get started:
-#
-# ```nim
-# type
-#   UVec3 = object
-#     x, y, z: uint32
-#
-# var gl_GlobalInvocationID*: UVec3
-#
-# proc runComputeOnCpu(computeShader: proc(), invocationSize: UVec3) =
-#   for z in 0 ..< invocationSize.z:
-#     for y in 0 ..< invocationSize.y:
-#       for x in 0 ..< invocationSize.x:
-#         gl_GlobalInvocationID = uvec3(x, y, z)
-#         computeShader()
-# ```
-#
-# But a lot of OpenGL compute stuff are missing such as globals for
-# gl_WorkGroupSize, gl_WorkGroupID, gl_NumWorkGroups, gl_LocalInvocationID, etc.
-# Please create the simulated environment to run a fake compute shader and write
-# an example reduction shader.
+# https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
+import std/math
 
 type
   UVec3 = object
@@ -56,16 +35,20 @@ proc runComputeOnCpu(computeShader: proc(), numWorkGroups: UVec3, workGroupSize:
               )
               computeShader()
 
-# Example reduction shader
-var
-  inputData: array[16, float32] = [
-    1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0,
-    9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0
-  ]
-  outputData: array[4, float32]
+template barrier() = discard
 
-const localSize = 4
-var sharedData: array[localSize, float32]
+# Reduction shader
+const
+  numElements = 64
+  localSize = 4 # workgroupSize
+  gridSize = numElements div (localSize * 2) # numWorkGroups
+
+var
+  inputData: array[numElements, float32]
+  outputData: array[gridSize, float32]
+
+var sharedData: array[localSize, float32] # Because each workgroup runs sequentially this is correct.
+let n: uint32 = numElements # was a shader uniform
 
 proc reductionShader() =
   let localIdx = gl_LocalInvocationID.x
@@ -73,33 +56,35 @@ proc reductionShader() =
   let globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx
 
   sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + localSize]
-  # barrier simulation (not needed in single-threaded CPU simulation)
+  barrier() # barrier simulation
 
   var stride = localSize div 2
   while stride > 0:
     if localIdx < stride:
       sharedData[localIdx] += sharedData[localIdx + stride]
-    # barrier simulation (not needed in single-threaded CPU simulation)
+    barrier()
     stride = stride div 2
 
   if localIdx == 0:
     outputData[gl_WorkGroupID.x] = sharedData[0]
 
-# proc reductionShader() =
-#   # Perform a simple reduction: sum all elements
-#   let globalID = gl_GlobalInvocationID.x
-#   if globalID < data.len.uint32:
-#     result += data[globalID]
+# End of shader code
 
-# Set the number of work groups and the size of each work group
-let numWorkGroups = uvec3(4, 1, 1)
-let workGroupSize = uvec3(localSize, 1, 1)
+proc main =
+  # Set the number of work groups and the size of each work group
+  let numWorkGroups = uvec3(gridSize, 1, 1)
+  let workGroupSize = uvec3(localSize, 1, 1)
 
-# Run the compute shader on CPU
-runComputeOnCpu(reductionShader, numWorkGroups, workGroupSize)
+  # Fill the input buffer
+  for i in 0..<numElements:
+    inputData[i] = float(i)
 
-var result: float32 = 0
-for x in outputData:
-  result += x
+  # Run the compute shader on CPU
+  runComputeOnCpu(reductionShader, numWorkGroups, workGroupSize)
 
-echo "Reduction result: ", result
+  let result = sum(outputData)
+  let expected: float32 = (numElements - 1)*numElements div 2
+  echo "Reduction result: ", result, ", expected: ", expected
+  assert result == expected
+
+main()
