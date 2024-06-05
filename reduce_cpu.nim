@@ -28,7 +28,8 @@ proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
-    buffers: Locker[tuple[input, output: seq[int32]]], smem: ptr[seq[int32]], n: uint) {.gcsafe.} =
+                     buffers: Locker[tuple[input, output: seq[int32]]],
+                     smem: ptr[seq[int32]], n: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
   let globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
@@ -48,8 +49,8 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     unprotected buffers as b:
       b.output[env.gl_WorkGroupID.x] = smem[0]
 
-proc runComputeOnCpu(
-    numWorkGroups: UVec3, workGroupSize: UVec3, buffers: Locker[tuple[input, output: seq[int32]]], n: uint) =
+proc runComputeOnCpu(numWorkGroups: UVec3, workGroupSize: UVec3,
+                     buffers: Locker[tuple[input, output: seq[int32]]], n: uint) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
   env.gl_WorkGroupSize = workGroupSize

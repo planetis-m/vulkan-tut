@@ -1,3 +1,4 @@
+# https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
 import opengl, opengl/glut, std/[strutils, times]
 
 const
@@ -6,7 +7,6 @@ const
   NumWorkGroups = NumElements div (WorkGroupSize * 2)
 
   ShaderCode = format("""
-// https://github.com/hsaputra/cuda_training
 #version 460
 
 layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
@@ -38,7 +38,7 @@ void main() {
   sharedData[localIdx] = sum;
   barrier();
 
-  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
     if (localIdx < stride) {
       sum += sharedData[localIdx + stride];
       sharedData[localIdx] = sum;
