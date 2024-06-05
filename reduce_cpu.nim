@@ -1,41 +1,88 @@
 # https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
-import std/math
+# Compile with `-d:danger --opt:none --panics:on --threads:on --threadanalysis:off --tlsEmulation:off --mm:arc -g`
+# ...and debug with nim-gdb
+import std/math, threading/barrier, malebolgia, malebolgia/lockers
 
 type
   UVec3 = object
-    x, y, z: uint32
+    x, y, z: uint
 
-var
-  gl_GlobalInvocationID*: UVec3
-  gl_WorkGroupSize*: UVec3
-  gl_WorkGroupID*: UVec3
-  gl_NumWorkGroups*: UVec3
-  gl_LocalInvocationID*: UVec3
+type
+  GlEnvironment* = object
+    gl_GlobalInvocationID*: UVec3
+    gl_WorkGroupSize*: UVec3
+    gl_WorkGroupID*: UVec3
+    gl_NumWorkGroups*: UVec3
+    gl_LocalInvocationID*: UVec3
 
-proc uvec3(x, y, z: uint32): UVec3 =
-  result.x = x
-  result.y = y
-  result.z = z
+  BarrierHandle* = object
+    x: ptr Barrier
 
-proc runComputeOnCpu(computeShader: proc(), numWorkGroups: UVec3, workGroupSize: UVec3) =
-  gl_NumWorkGroups = numWorkGroups
-  gl_WorkGroupSize = workGroupSize
+proc uvec3(x, y, z: uint): UVec3 =
+  result = UVec3(x: x, y: y, z: z)
+
+proc getHandle*(b: var Barrier): BarrierHandle {.inline.} =
+  result = BarrierHandle(x: addr(b))
+
+proc wait*(m: BarrierHandle) {.inline.} =
+  wait(m.x[])
+
+proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
+    buffers: Locker[tuple[input, output: seq[int32]]], shared: Locker[seq[int32]], n: uint) {.nimcall, gcsafe.} =
+  let localIdx = env.gl_LocalInvocationID.x
+  let localSize = env.gl_WorkGroupSize.x
+  let globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
+
+  var sum: int32 = 0
+  unprotected buffers as b:
+    sum = b.input[globalIdx] + b.input[globalIdx + localSize]
+  unprotected shared as s:
+    s[localIdx] = sum
+  wait barrier
+
+  var stride = localSize div 2
+  while stride > 0:
+    if localIdx < stride:
+      unprotected shared as s:
+        s[localIdx] += s[localIdx + stride]
+    wait barrier # was memoryBarrierShared
+    stride = stride div 2
+
+  if localIdx == 0:
+    var res: int32 = 0
+    unprotected shared as s:
+      res = s[0]
+    unprotected buffers as b:
+      b.output[env.gl_WorkGroupID.x] = res
+
+proc runComputeOnCpu(
+    numWorkGroups: UVec3, workGroupSize: UVec3, buffers: Locker[tuple[input, output: seq[int32]]], n: uint) =
+  var env: GlEnvironment
+  env.gl_NumWorkGroups = numWorkGroups
+  env.gl_WorkGroupSize = workGroupSize
+
   for wgZ in 0 ..< numWorkGroups.z:
     for wgY in 0 ..< numWorkGroups.y:
       for wgX in 0 ..< numWorkGroups.x:
-        gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-        for z in 0 ..< workGroupSize.z:
-          for y in 0 ..< workGroupSize.y:
-            for x in 0 ..< workGroupSize.x:
-              gl_LocalInvocationID = uvec3(x, y, z)
-              gl_GlobalInvocationID = uvec3(
-                wgX * workGroupSize.x + x,
-                wgY * workGroupSize.y + y,
-                wgZ * workGroupSize.z + z
-              )
-              computeShader()
+        env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
 
-template barrier() = discard
+        var barrier = createBarrier(workGroupSize.x)
+        var shared = initLocker newSeq[int32](workGroupSize.x)
+
+        var m = createMaster()
+        m.awaitAll:
+          for z in 0 ..< workGroupSize.z:
+            for y in 0 ..< workGroupSize.y:
+              for x in 0 ..< workGroupSize.x:
+                env.gl_LocalInvocationID = uvec3(x, y, z)
+                env.gl_GlobalInvocationID = uvec3(
+                  wgX * workGroupSize.x + x,
+                  wgY * workGroupSize.y + y,
+                  wgZ * workGroupSize.z + z
+                )
+                m.spawn reductionShader(env, barrier.getHandle(), buffers, shared, n)
+
+# End of shader code
 
 # Reduction shader
 const
@@ -43,47 +90,26 @@ const
   localSize = 4 # workgroupSize
   gridSize = numElements div (localSize * 2) # numWorkGroups
 
-var
-  inputData: array[numElements, float32]
-  outputData: array[gridSize, float32]
-
-var sharedData: array[localSize, float32] # Because each workgroup runs sequentially this is correct.
-let n: uint32 = numElements # was a shader uniform
-
-proc reductionShader() =
-  let localIdx = gl_LocalInvocationID.x
-  let localSize = gl_WorkGroupSize.x
-  let globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx
-
-  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + localSize]
-  barrier() # barrier simulation
-
-  var stride = localSize div 2
-  while stride > 0:
-    if localIdx < stride:
-      sharedData[localIdx] += sharedData[localIdx + stride]
-    barrier()
-    stride = stride div 2
-
-  if localIdx == 0:
-    outputData[gl_WorkGroupID.x] = sharedData[0]
-
-# End of shader code
-
 proc main =
   # Set the number of work groups and the size of each work group
   let numWorkGroups = uvec3(gridSize, 1, 1)
   let workGroupSize = uvec3(localSize, 1, 1)
 
+  var
+    inputData = newSeq[int32](numElements)
+    outputData = newSeq[int32](gridSize)
+
   # Fill the input buffer
   for i in 0..<numElements:
-    inputData[i] = float(i)
+    inputData[i] = int32(i)
+
+  var buffers = initLocker (inputData, outputData)
 
   # Run the compute shader on CPU
-  runComputeOnCpu(reductionShader, numWorkGroups, workGroupSize)
-
+  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, numElements)
   let result = sum(outputData)
-  let expected: float32 = (numElements - 1)*numElements div 2
+
+  let expected = (numElements - 1)*numElements div 2
   echo "Reduction result: ", result, ", expected: ", expected
   assert result == expected
 
