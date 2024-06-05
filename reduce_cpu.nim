@@ -95,22 +95,20 @@ proc main =
   let numWorkGroups = uvec3(gridSize, 1, 1)
   let workGroupSize = uvec3(localSize, 1, 1)
 
-  var
-    inputData = newSeq[int32](numElements)
-    outputData = newSeq[int32](gridSize)
-
   # Fill the input buffer
+  var inputData = newSeq[int32](numElements)
   for i in 0..<numElements:
     inputData[i] = int32(i)
 
-  var buffers = initLocker (inputData, outputData)
+  var buffers = initLocker (inputData, newSeq[int32](gridSize))
 
   # Run the compute shader on CPU
   runComputeOnCpu(numWorkGroups, workGroupSize, buffers, numElements)
-  let result = sum(outputData)
 
-  let expected = (numElements - 1)*numElements div 2
-  echo "Reduction result: ", result, ", expected: ", expected
-  assert result == expected
+  unprotected buffers as b:
+    let result = sum(b[1])
+    let expected = (numElements - 1)*numElements div 2
+    echo "Reduction result: ", result, ", expected: ", expected
+    assert result == expected
 
 main()
