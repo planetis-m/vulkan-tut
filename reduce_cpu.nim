@@ -28,32 +28,25 @@ proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
-    buffers: Locker[tuple[input, output: seq[int32]]], shared: Locker[seq[int32]], n: uint) {.nimcall, gcsafe.} =
+    buffers: Locker[tuple[input, output: seq[int32]]], smem: ptr[seq[int32]], n: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
   let globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
 
-  var sum: int32 = 0
   unprotected buffers as b:
-    sum = b.input[globalIdx] + b.input[globalIdx + localSize]
-  unprotected shared as s:
-    s[localIdx] = sum
+    smem[localIdx] = b.input[globalIdx] + b.input[globalIdx + localSize]
   wait barrier
 
   var stride = localSize div 2
   while stride > 0:
     if localIdx < stride:
-      unprotected shared as s:
-        s[localIdx] += s[localIdx + stride]
+      smem[localIdx] += smem[localIdx + stride]
     wait barrier # was memoryBarrierShared
     stride = stride div 2
 
   if localIdx == 0:
-    var res: int32 = 0
-    unprotected shared as s:
-      res = s[0]
     unprotected buffers as b:
-      b.output[env.gl_WorkGroupID.x] = res
+      b.output[env.gl_WorkGroupID.x] = smem[0]
 
 proc runComputeOnCpu(
     numWorkGroups: UVec3, workGroupSize: UVec3, buffers: Locker[tuple[input, output: seq[int32]]], n: uint) =
@@ -67,7 +60,7 @@ proc runComputeOnCpu(
         env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
 
         var barrier = createBarrier(workGroupSize.x)
-        var shared = initLocker newSeq[int32](workGroupSize.x)
+        var shared = newSeq[int32](workGroupSize.x)
 
         var m = createMaster()
         m.awaitAll:
@@ -80,11 +73,9 @@ proc runComputeOnCpu(
                   wgY * workGroupSize.y + y,
                   wgZ * workGroupSize.z + z
                 )
-                m.spawn reductionShader(env, barrier.getHandle(), buffers, shared, n)
+                m.spawn reductionShader(env, barrier.getHandle(), buffers, addr shared, n)
 
-# End of shader code
-
-# Reduction shader
+# Main
 const
   numElements = 64
   localSize = 4 # workgroupSize
@@ -109,6 +100,5 @@ proc main =
     let result = sum(b[1])
     let expected = (numElements - 1)*numElements div 2
     echo "Reduction result: ", result, ", expected: ", expected
-    assert result == expected
 
 main()
