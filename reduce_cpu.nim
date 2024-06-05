@@ -1,5 +1,6 @@
 # https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
-# Compile with `-d:danger --opt:none --panics:on --threads:on --threadanalysis:off --tlsEmulation:off --mm:arc -g`
+# Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
+# `-d:danger --opt:none --panics:on --threads:on --threadanalysis:off --tlsEmulation:off --mm:arc -g`
 # ...and debug with nim-gdb
 import std/math, threading/barrier, malebolgia, malebolgia/lockers
 
@@ -32,10 +33,22 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      smem: ptr[seq[int32]], n: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
-  let globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
+  var globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
 
-  unprotected buffers as b:
-    smem[localIdx] = b.input[globalIdx] + b.input[globalIdx + localSize]
+  let gridSize = localSize * 2 * env.gl_NumWorkGroups.x
+
+  var sum: int32 = 0
+  while globalIdx < n:
+    unprotected buffers as b:
+      echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
+      sum = sum + b.input[globalIdx] + b.input[globalIdx + localSize]
+      b.input[globalIdx] = sum
+    globalIdx = globalIdx + gridSize
+  smem[localIdx] = sum
+
+  # unprotected buffers as b:
+  #   smem[localIdx] = b.input[globalIdx] + b.input[globalIdx + localSize]
+
   wait barrier
 
   var stride = localSize div 2
@@ -63,7 +76,7 @@ proc runComputeOnCpu(numWorkGroups: UVec3, workGroupSize: UVec3,
         var barrier = createBarrier(workGroupSize.x)
         var shared = newSeq[int32](workGroupSize.x)
 
-        var m = createMaster()
+        var m = createMaster(activeProducer = true)
         m.awaitAll:
           for z in 0 ..< workGroupSize.z:
             for y in 0 ..< workGroupSize.y:
