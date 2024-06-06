@@ -1,6 +1,7 @@
 # https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
+# https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
-# `-d:danger --opt:none --panics:on --threads:on --threadanalysis:off --tlsEmulation:off --mm:arc -g`
+# `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -g`
 # ...and debug with nim-gdb
 import std/math, threading/barrier, malebolgia, malebolgia/lockers
 
@@ -8,7 +9,6 @@ type
   UVec3 = object
     x, y, z: uint
 
-type
   GlEnvironment* = object
     gl_GlobalInvocationID*: UVec3
     gl_WorkGroupSize*: UVec3
@@ -39,8 +39,8 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   var sum: int32 = 0
   while globalIdx < n:
+    echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     unprotected buffers as b:
-      echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
       sum = sum + b.input[globalIdx] + b.input[globalIdx + localSize]
       b.input[globalIdx] = sum
     globalIdx = globalIdx + gridSize
@@ -62,7 +62,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     unprotected buffers as b:
       b.output[env.gl_WorkGroupID.x] = smem[0]
 
-proc runComputeOnCpu(numWorkGroups: UVec3, workGroupSize: UVec3,
+proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
                      buffers: Locker[tuple[input, output: seq[int32]]], n: uint) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
@@ -72,6 +72,7 @@ proc runComputeOnCpu(numWorkGroups: UVec3, workGroupSize: UVec3,
     for wgY in 0 ..< numWorkGroups.y:
       for wgX in 0 ..< numWorkGroups.x:
         env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
+        echo "New workgroup! id ", wgX
 
         var barrier = createBarrier(workGroupSize.x)
         var shared = newSeq[int32](workGroupSize.x)
@@ -91,9 +92,10 @@ proc runComputeOnCpu(numWorkGroups: UVec3, workGroupSize: UVec3,
 
 # Main
 const
-  numElements = 64
+  numElements = 256
+  elementsPerThread = 4
   localSize = 4 # workgroupSize
-  gridSize = numElements div (localSize * 2) # numWorkGroups
+  gridSize = numElements div (localSize * 2 * elementsPerThread) # numWorkGroups
 
 proc main =
   # Set the number of work groups and the size of each work group
