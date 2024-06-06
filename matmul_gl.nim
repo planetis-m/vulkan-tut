@@ -1,4 +1,5 @@
 import opengl, opengl/glut, std/[math, strutils, times, random]
+# https://youtu.be/b8ESCws3_1s
 
 const
   workgroupSize = (x: 32, y: 32)
@@ -29,14 +30,19 @@ layout(std140, binding = 3) uniform MatrixSize {
 void main() {
   uint row = gl_GlobalInvocationID.x;
   uint col = gl_GlobalInvocationID.y;
-  if (row >= M || col >= P) {
-    return;
+  if (row < M && col < P) {
+    float sum = 0.0;
+    for (uint k = 0; k < N; k += 4) {
+      // Threads on the same row all access the same elements
+      vec4 a_tmp = vec4(dataA[row * N + k], dataA[row * N + k+1], dataA[row * N + k+2], dataA[row * N + k+3]);
+      // Compute 4 results per iteration
+      sum += a_tmp.x * dataB[k * P + col];
+      sum += a_tmp.y * dataB[(k+1) * P + col];
+      sum += a_tmp.z * dataB[(k+2) * P + col];
+      sum += a_tmp.w * dataB[(k+3) * P + col];
+    }
+    dataC[row * P + col] = sum;
   }
-  float sum = 0.0;
-  for (uint k = 0; k < N; ++k) {
-    sum += dataA[row * N + k] * dataB[k * P + col];
-  }
-  dataC[row * P + col] = sum;
 }
 """
 
@@ -176,7 +182,7 @@ proc main =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   template ff(f: float, prec: int = 4): string =
-   formatFloat(f*1000, ffDecimal, prec) # ms
+    formatFloat(f*1000, ffDecimal, prec) # ms
 
   echo "Process: ", ff(t1-t0), " Map: ", ff(t2-t1), " Read: ", ff(t3-t2)
 

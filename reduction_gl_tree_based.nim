@@ -25,14 +25,36 @@ void main() {
   uint localSize = gl_WorkGroupSize.x;
   uint globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx;
 
-  sharedData[localIdx] = inputData[globalIdx] + inputData[globalIdx + localSize];
+  sharedData[localIdx] = 0;
+  while (globalIdx < n) {
+    sharedData[localIdx] += inputData[globalIdx] + inputData[globalIdx + localSize];
+    globalIdx += gl_NumWorkGroups.x;
+  }
   barrier();
 
-  for (uint stride = localSize / 2; stride > 0; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
-    barrier();
+    memoryBarrierShared();
+  }
+
+  // Final reduction within each subgroup
+  if (localIdx < 64) {
+    sharedData[localIdx] += sharedData[localIdx + 64];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 32];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 16];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 8];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 4];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 2];
+    memoryBarrierShared();
+    sharedData[localIdx] += sharedData[localIdx + 1];
+    memoryBarrierShared();
   }
 
   if (localIdx == 0) {
@@ -151,10 +173,9 @@ proc performFinalReduction(resources: Reduction) =
   # Ensure all work is done
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-proc readResult(outputBuffer: GLuint): float32 =
+proc readResult(resources: Reduction): float32 =
   # Read back the result
-  result = 0
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.resultBuffer)
   glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float32), addr result)
 
 template ff(f: float, prec: int = 4): string =
@@ -169,7 +190,7 @@ proc main() =
     performFirstReduction(resources)
     performFinalReduction(resources)
     let duration = cpuTime()
-    let result = readResult(resources.resultBuffer)
+    let result = readResult(resources)
     echo "Final reduction result: ", result
     echo "Runtime: ", ff(duration)
   finally:

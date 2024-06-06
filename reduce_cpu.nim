@@ -39,7 +39,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   var sum: int32 = 0
   while globalIdx < n:
-    echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
+    # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     unprotected buffers as b:
       sum = sum + b.input[globalIdx] + b.input[globalIdx + localSize]
       b.input[globalIdx] = sum
@@ -54,6 +54,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
   var stride = localSize div 2
   while stride > 0:
     if localIdx < stride:
+      echo "Final reduction ", localIdx, " + ", localIdx + stride
       smem[localIdx] += smem[localIdx + stride]
     wait barrier # was memoryBarrierShared
     stride = stride div 2

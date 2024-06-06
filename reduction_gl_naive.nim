@@ -4,7 +4,8 @@ import opengl, opengl/glut, std/[strutils, times]
 const
   WorkGroupSize = 256
   NumElements = 1048576
-  NumWorkGroups = NumElements div (WorkGroupSize * 2)
+  ElementsPerThread = 1024
+  NumWorkGroups = NumElements div (WorkGroupSize * 2 * ElementsPerThread)
 
   ShaderCode = format("""
 #version 460
