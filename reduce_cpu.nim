@@ -54,7 +54,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
   var stride = localSize div 2
   while stride > 0:
     if localIdx < stride:
-      echo "Final reduction ", localIdx, " + ", localIdx + stride
+      # echo "Final reduction ", localIdx, " + ", localIdx + stride
       smem[localIdx] += smem[localIdx + stride]
     wait barrier # was memoryBarrierShared
     stride = stride div 2
@@ -74,10 +74,10 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
       for wgX in 0 ..< numWorkGroups.x:
         env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
         echo "New workgroup! id ", wgX
-
-        var barrier = createBarrier(workGroupSize.x)
+        # Declare your shared variables here.
         var shared = newSeq[int32](workGroupSize.x)
 
+        var barrier = createBarrier(workGroupSize.x)
         var m = createMaster(activeProducer = true)
         m.awaitAll:
           for z in 0 ..< workGroupSize.z:
@@ -110,7 +110,7 @@ proc main =
 
   var buffers = initLocker (inputData, newSeq[int32](gridSize))
 
-  # Run the compute shader on CPU
+  # Run the compute shader on CPU, pass buffers and normals as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, buffers, numElements)
 
   unprotected buffers as b:
