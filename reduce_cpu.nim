@@ -50,7 +50,6 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
   #   smem[localIdx] = b.input[globalIdx] + b.input[globalIdx + localSize]
 
   wait barrier
-
   var stride = localSize div 2
   while stride > 0:
     if localIdx < stride:
@@ -78,8 +77,8 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
         var shared = newSeq[int32](workGroupSize.x)
 
         var barrier = createBarrier(workGroupSize.x)
-        var m = createMaster(activeProducer = true)
-        m.awaitAll:
+        var master = createMaster(activeProducer = true)
+        master.awaitAll:
           for z in 0 ..< workGroupSize.z:
             for y in 0 ..< workGroupSize.y:
               for x in 0 ..< workGroupSize.x:
@@ -89,7 +88,7 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
                   wgY * workGroupSize.y + y,
                   wgZ * workGroupSize.z + z
                 )
-                m.spawn reductionShader(env, barrier.getHandle(), buffers, addr shared, n)
+                master.spawn reductionShader(env, barrier.getHandle(), buffers, addr shared, n)
 
 # Main
 const
@@ -108,13 +107,13 @@ proc main =
   for i in 0..<numElements:
     inputData[i] = int32(i)
 
-  var buffers = initLocker (inputData, newSeq[int32](gridSize))
+  var buffers = initLocker (input: inputData, output: newSeq[int32](gridSize))
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, buffers, numElements)
 
   unprotected buffers as b:
-    let result = sum(b[1])
+    let result = sum(b.output)
     let expected = (numElements - 1)*numElements div 2
     echo "Reduction result: ", result, ", expected: ", expected
 
