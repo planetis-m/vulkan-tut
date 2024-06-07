@@ -1,4 +1,4 @@
-import std/[math, strformat], threading/barrier, malebolgia, malebolgia/lockers
+import std/[math, strutils], threading/barrier, malebolgia, malebolgia/lockers
 
 type
   UVec3 = object
@@ -67,11 +67,12 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
 # Main
 const
   n = 32
+  localSize = 4 # workgroupSize
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(n div 2, n div 2, 1)
-  let workGroupSize = uvec3(2, 2, 1)
+  let numWorkGroups = uvec3(n div localSize, n div localSize, 1)
+  let workGroupSize = uvec3(localSize, localSize, 1)
 
   # Initialize the matrices
   var A = newSeq[float32](n * n)
@@ -94,6 +95,6 @@ proc main =
         for k in 0..<n:
           expected += b.A[i * n + k] * b.B[k * n + j]
         assert b.C[i * n + j] == expected,
-          (let tmp = b.C[i * n + j]; &"Mismatch at C[{i}, {j}]: expected {expected}, got {tmp}")
+          "Mismatch at C[$#, $#]: expected $#, got $#".format(i, j, expected, b.C[i * n + j])
 
 main()
