@@ -2,7 +2,7 @@
 # https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
 # `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -g`
-# ...and debug with nim-gdb
+# ...and debug with nim-gdb or lldb
 import std/math, threading/barrier, malebolgia, malebolgia/lockers
 
 type
