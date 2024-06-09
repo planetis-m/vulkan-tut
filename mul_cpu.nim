@@ -91,15 +91,15 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
 # Main
 const
   M = 64
-  K = 32
-  N = 16
+  K = 16
+  N = 32
   localSize = 4 # workgroupSize
   alpha: float32 = 1
   beta: float32 = 0
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(M div localSize, N div localSize, 1)
+  let numWorkGroups = uvec3(ceilDiv(M, localSize).uint, ceilDiv(N, localSize).uint, 1)
   let workGroupSize = uvec3(localSize, localSize, 1)
 
   # Initialize the matrices
