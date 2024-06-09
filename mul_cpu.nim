@@ -28,14 +28,13 @@ proc wait*(m: BarrierHandle) {.inline.} =
 proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
                  buffers: Locker[tuple[A, B, C: seq[float32]]],
                  smem: ptr[tuple[sharedA, sharedB: seq[float32]]],
-                 M, K, N, tileSize: int, alpha, beta: float32) {.gcsafe.} =
+                 alpha, beta: float32, M, K, N, tileSize: int) {.gcsafe.} =
   let localRow = env.gl_LocalInvocationID.x.int
   let localCol = env.gl_LocalInvocationID.y.int
   let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localRow
   let globalCol = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localCol
 
   var sum: float32 = 0
-
   for tileIndex in countup(0, K div tileSize):
     # Load tiles into shared memory
     unprotected buffers as b:
@@ -60,8 +59,8 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
       b.C[globalRow * N + globalCol] = alpha * sum + beta * b.C[globalRow * N + globalCol]
 
 proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
-                     buffers: Locker[tuple[A, B, C: seq[float32]]], M, K, N, tileSize: int,
-                     alpha, beta: float32) =
+                     buffers: Locker[tuple[A, B, C: seq[float32]]], alpha, beta: float32,
+                     M, K, N, tileSize: int) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
   env.gl_WorkGroupSize = workGroupSize
@@ -86,7 +85,7 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
                   wgZ * workGroupSize.z + z
                 )
                 master.spawn sgemmShader(env, barrier.getHandle(), buffers,
-                                         addr shared, M, K, N, tileSize, alpha, beta)
+                                         addr shared, alpha, beta, M, K, N, tileSize)
 
 # Main
 const
@@ -114,7 +113,7 @@ proc main =
   var buffers = initLocker (A: A, B: B, C: newSeq[float32](M * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, M, K, N, localSize, alpha, beta)
+  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, alpha, beta, M, K, N, localSize)
 
   unprotected buffers as b:
     # Verify the result
