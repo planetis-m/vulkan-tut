@@ -1,4 +1,5 @@
 # Compile with at least `-d:ThreadPoolSize=workgroupSize*workgroupSize+1`
+# https://youtu.be/QGYvbsHDPxo and https://youtu.be/jWmtNGqub8c
 import std/[math, strutils], threading/barrier, malebolgia, malebolgia/lockers
 
 type
@@ -24,37 +25,43 @@ proc getHandle*(b: var Barrier): BarrierHandle {.inline.} =
 proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
 
-proc matrixMultiplyShader(env: GlEnvironment, barrier: BarrierHandle,
-                          buffers: Locker[tuple[A, B, C: seq[float32]]],
-                          smem: ptr[tuple[sharedA, sharedB: seq[float32]]], n, tileSize: int) {.gcsafe.} =
-  let localRow = env.gl_LocalInvocationID.x.int
-  let localCol = env.gl_LocalInvocationID.y.int
-  let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localRow
-  let globalCol = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localCol
+proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
+                 buffers: Locker[tuple[A, B, C: seq[float32]]],
+                 smem: ptr[tuple[sharedA, sharedB: seq[float32]]],
+                 M, K, N, tileSize: int, alpha, beta: float32) {.gcsafe.} =
+  let localRow = env.gl_LocalInvocationID.y.int
+  let localCol = env.gl_LocalInvocationID.x.int
+  let globalRow = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localRow
+  let globalCol = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localCol
 
   var sum: float32 = 0
 
-  var tileIndex = 0
-  while tileIndex * tileSize < n:
+  for tileIndex in countup(0, K div tileSize):
     # Load tiles into shared memory
     unprotected buffers as b:
-      smem.sharedA[localRow * tileSize + localCol] = b.A[globalRow * n + tileIndex * tileSize + localCol]
-      smem.sharedB[localRow * tileSize + localCol] = b.B[(tileIndex * tileSize + localRow) * n + globalCol]
+      if globalRow < M and (tileIndex * tileSize + localCol) < K:
+        smem.sharedA[localRow * tileSize + localCol] = b.A[globalRow * K + tileIndex * tileSize + localCol]
+      else:
+        smem.sharedA[localRow * tileSize + localCol] = 0
+      if globalCol < N and (tileIndex * tileSize + localRow) < K:
+        smem.sharedB[localRow * tileSize + localCol] = b.B[(tileIndex * tileSize + localRow) * N + globalCol]
+      else:
+        smem.sharedB[localRow * tileSize + localCol] = 0
     # Wait for both tiles to be loaded in before doing computation
     wait barrier
     # Compute the partial product for this tile
-    for k in 0..<tileSize:
-      sum += smem.sharedA[localRow * tileSize + k] * smem.sharedB[k * tileSize + localCol]
+    for j in 0..<tileSize:
+      sum += smem.sharedA[localRow * tileSize + j] * smem.sharedB[j * tileSize + localCol]
     # Wait for all threads to finish using current tiles before loading in new
     wait barrier
-    inc tileIndex
 
-  if globalRow < n and globalCol < n:
-    unprotected buffers as b:
-      b.C[globalRow * n + globalCol] = sum
+  unprotected buffers as b:
+    if globalRow < M and globalCol < N:
+      b.C[globalRow * N + globalCol] = alpha * sum + beta * b.C[globalRow * N + globalCol]
 
 proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
-                     buffers: Locker[tuple[A, B, C: seq[float32]]], n, tileSize: int) =
+                     buffers: Locker[tuple[A, B, C: seq[float32]]], M, K, N, tileSize: int,
+                     alpha, beta: float32) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
   env.gl_WorkGroupSize = workGroupSize
@@ -78,40 +85,47 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
                   wgY * workGroupSize.y + y,
                   wgZ * workGroupSize.z + z
                 )
-                master.spawn matrixMultiplyShader(env, barrier.getHandle(), buffers, addr shared, n, tileSize)
+                master.spawn sgemmShader(env, barrier.getHandle(), buffers,
+                                         addr shared, M, K, N, tileSize, alpha, beta)
 
 # Main
 const
-  n = 32
+  M = 64
+  K = 32
+  N = 16
   localSize = 4 # workgroupSize
+  alpha: float32 = 1
+  beta: float32 = 0
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(n div localSize, n div localSize, 1)
+  let numWorkGroups = uvec3(ceil(M / localSize).uint, ceil(N / localSize).uint, 1)
   let workGroupSize = uvec3(localSize, localSize, 1)
 
   # Initialize the matrices
-  var A = newSeq[float32](n * n)
-  var B = newSeq[float32](n * n)
+  var A = newSeq[float32](M * K)
+  var B = newSeq[float32](K * N)
 
-  for i in 0..<n*n:
+  for i in 0..<M*K:
     A[i] = float32(i)
-  for i in 0..<n*n:
+  for i in 0..<K*N:
     B[i] = float32(i)
 
-  var buffers = initLocker (A: A, B: B, C: newSeq[float32](n * n))
+  var buffers = initLocker (A: A, B: B, C: newSeq[float32](K * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, n, localSize)
+  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, M, K, N, localSize, alpha, beta)
 
   unprotected buffers as b:
     # Verify the result
-    for i in 0..<n:
-      for j in 0..<n:
+    echo b.C
+    for i in 0..<M:
+      for j in 0..<N:
         var expected: float32 = 0
-        for k in 0..<n:
-          expected += b.A[i * n + k] * b.B[k * n + j]
-        assert b.C[i * n + j] == expected,
-            "Mismatch at C[$1, $2]: expected $3, got $4".format(i, j, expected, b.C[i * n + j])
+        for k in 0..<K:
+          expected += alpha * b.A[i * K + k] * b.B[k * N + j]
+        expected += beta * b.C[i * N + j]
+        assert b.C[i * N + j] == expected,
+            "Mismatch at C[$1, $2]: expected $3, got $4".format(i, j, expected, b.C[i * N + j])
 
 main()
