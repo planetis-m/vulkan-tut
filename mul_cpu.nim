@@ -29,10 +29,10 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
                  buffers: Locker[tuple[A, B, C: seq[float32]]],
                  smem: ptr[tuple[sharedA, sharedB: seq[float32]]],
                  M, K, N, tileSize: int, alpha, beta: float32) {.gcsafe.} =
-  let localRow = env.gl_LocalInvocationID.y.int
-  let localCol = env.gl_LocalInvocationID.x.int
-  let globalRow = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localRow
-  let globalCol = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localCol
+  let localRow = env.gl_LocalInvocationID.x.int
+  let localCol = env.gl_LocalInvocationID.y.int
+  let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localRow
+  let globalCol = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localCol
 
   var sum: float32 = 0
 
@@ -99,7 +99,7 @@ const
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceil(M / localSize).uint, ceil(N / localSize).uint, 1)
+  let numWorkGroups = uvec3(M div localSize, N div localSize, 1)
   let workGroupSize = uvec3(localSize, localSize, 1)
 
   # Initialize the matrices
@@ -111,14 +111,13 @@ proc main =
   for i in 0..<K*N:
     B[i] = float32(i)
 
-  var buffers = initLocker (A: A, B: B, C: newSeq[float32](K * N))
+  var buffers = initLocker (A: A, B: B, C: newSeq[float32](M * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, buffers, M, K, N, localSize, alpha, beta)
 
   unprotected buffers as b:
     # Verify the result
-    echo b.C
     for i in 0..<M:
       for j in 0..<N:
         var expected: float32 = 0
