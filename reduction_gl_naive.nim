@@ -144,6 +144,7 @@ proc initOpenGLContext() =
   glutInitWindowSize(640, 480)
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
+  glutHideWindow()
   loadExtensions()
 
 proc initResources(): Reduction =

@@ -92,6 +92,7 @@ const
   M = 64
   K = 16
   N = 32
+
   localSize = 4 # workgroupSize
   alpha: float32 = 1
   beta: float32 = 0

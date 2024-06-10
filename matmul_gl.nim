@@ -1,13 +1,16 @@
 import opengl, opengl/glut, std/[math, strutils, times, random]
-# https://youtu.be/b8ESCws3_1s
 
 const
-  workgroupSize = (x: 32, y: 32)
+  WorkGroupSizeX = 32
+  WorkGroupSizeY = 32
+  M = 1024
+  N = 2048
+  P = 1024
 
-  shaderCode = """
+  ShaderCode = format("""
 #version 460
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(local_size_x = $1, local_size_y = $2, local_size_z = 1) in;
 
 layout(binding = 0) buffer MatrixA {
   float dataA[];
@@ -21,7 +24,7 @@ layout(binding = 2) buffer MatrixC {
   float dataC[];
 };
 
-layout(std140, binding = 3) uniform MatrixSize {
+layout(binding = 3) uniform MatrixSize {
   uint M; // number of rows in A and C
   uint N; // number of columns in A and rows in B
   uint P; // number of columns in B and C
@@ -33,9 +36,7 @@ void main() {
   if (row < M && col < P) {
     float sum = 0.0;
     for (uint k = 0; k < N; k += 4) {
-      // Threads on the same row all access the same elements
       vec4 a_tmp = vec4(dataA[row * N + k], dataA[row * N + k+1], dataA[row * N + k+2], dataA[row * N + k+3]);
-      // Compute 4 results per iteration
       sum += a_tmp.x * dataB[k * P + col];
       sum += a_tmp.y * dataB[(k+1) * P + col];
       sum += a_tmp.z * dataB[(k+2) * P + col];
@@ -44,17 +45,17 @@ void main() {
     dataC[row * P + col] = sum;
   }
 }
-"""
+""", WorkGroupSizeX, WorkGroupSizeY)
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
   glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
-  if status == GL_FALSE.Glint:
+  if status == GL_FALSE.GLint:
     var len: GLint
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetShaderInfoLog(shader, len, nil, cstring(log))
-    echo "Shader compilation error: ", log
+    raise newException(GLerror, "Shader compilation error: " & log)
 
 proc checkProgramLinking(program: GLuint) =
   var status: GLint
@@ -64,15 +65,111 @@ proc checkProgramLinking(program: GLuint) =
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetProgramInfoLog(program, len, nil, cstring(log))
-    echo "Program linking error: ", log
+    raise newException(GLerror, "Program linking error: " & log)
+
+proc loadShader(shaderType: GLenum, source: cstring): GLuint =
+  result = glCreateShader(shaderType)
+  if result != 0.GLUint:
+    glShaderSource(result, 1, cast[cstringArray](addr source), nil)
+    glCompileShader(result)
+    checkShaderCompilation(result)
+
+proc createComputeProgram(computeSource: cstring): GLuint =
+  let module = loadShader(GL_COMPUTE_SHADER, computeSource)
+  if module != 0.GLUint:
+    try:
+      result = glCreateProgram()
+      if result != 0.GLUint:
+        glAttachShader(result, module)
+        glLinkProgram(result)
+        checkProgramLinking(result)
+    finally:
+      glDeleteShader(module)
+
+proc createGPUBuffer(target: GLenum, size: GLsizeiptr, data: pointer, usage: GLenum): GLuint =
+  glGenBuffers(1, addr result)
+  glBindBuffer(target, result)
+  glBufferData(target, size, data, usage)
+  checkGLerror()
+
+type
+  MatrixMultiplication = object
+    program: GLuint
+    bufferA: GLuint
+    bufferB: GLuint
+    bufferC: GLuint
+    uniformBuffer: GLuint
+
+proc cleanup(x: MatrixMultiplication) =
+  glDeleteBuffers(1, addr x.bufferA)
+  glDeleteBuffers(1, addr x.bufferB)
+  glDeleteBuffers(1, addr x.bufferC)
+  glDeleteBuffers(1, addr x.uniformBuffer)
+  glDeleteProgram(x.program)
+
+proc initOpenGLContext() =
+  var argc: int32 = 0
+  glutInit(addr argc, nil)
+  glutInitDisplayMode(GLUT_DOUBLE)
+  glutInitWindowSize(640, 480)
+  glutInitWindowPosition(50, 50)
+  discard glutCreateWindow("OpenGL Compute")
+  glutHideWindow()
+  loadExtensions()
+
+proc initResources(): MatrixMultiplication =
+  result.program = createComputeProgram(ShaderCode.cstring)
+  let bufferSizeA = M * N * sizeof(float32)
+  let bufferSizeB = N * P * sizeof(float32)
+  let bufferSizeC = M * P * sizeof(float32)
+
+  result.bufferA = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeA, nil, GL_DYNAMIC_DRAW)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.bufferA)
+  let bufferAPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  for i in 0..<M*N:
+    bufferAPtr[i] = float32(i + 1)
+  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
+  result.bufferB = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeB, nil, GL_DYNAMIC_DRAW)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.bufferB)
+  let bufferBPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  for i in 0..<N*P:
+    bufferBPtr[i] = float32(i + 1)
+  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
+  result.bufferC = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeC, nil, GL_DYNAMIC_DRAW)
+
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, (3 * sizeof(uint32)).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
+  let uniformBufferPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  uniformBufferPtr[0] = M.uint32
+  uniformBufferPtr[1] = N.uint32
+  uniformBufferPtr[2] = P.uint32
+  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
+
+proc dispatchComputeShader(resources: MatrixMultiplication) =
+  glUseProgram(resources.program)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.bufferA)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.bufferB)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, resources.bufferC)
+  glBindBufferBase(GL_UNIFORM_BUFFER, 3, resources.uniformBuffer)
+  glDispatchCompute(ceilDiv(M, WorkGroupSizeX).GLuint, ceilDiv(P, WorkGroupSizeY).GLuint, 1)
+  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+
+proc readResults(resources: MatrixMultiplication): seq[float32] =
+  result = newSeq[float32](M * P)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.bufferC)
+  let bufferCPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  for i in 0..<M*P:
+    result[i] = bufferCPtr[i]
+  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 proc computeElement(m, n, p, row, col: int): float32 =
   result = 0
   for k in 0..<n:
-    result = result + float32(row * n + k + 1) * float32(k * p + col + 1)
+    result += float32(row * n + k + 1) * float32(k * p + col + 1)
 
-proc checkRandomSamples(shaderResult: openarray[float32],
-    m, n, p, numSamples: int): bool =
+proc checkRandomSamples(shaderResult: seq[float32], m, n, p, numSamples: int): bool =
   for i in 0..<numSamples:
     let row = rand(m-1)
     let col = rand(p-1)
@@ -81,116 +178,19 @@ proc checkRandomSamples(shaderResult: openarray[float32],
       return false
   result = true
 
-proc main =
+proc main() =
   randomize()
-  # Create an OpenGL context and window
-  var argc: int32 = 0
-  glutInit(addr argc, nil)
-  glutInitDisplayMode(GLUT_DOUBLE)
-  glutInitWindowSize(640, 480)
-  glutInitWindowPosition(50, 50)
-  discard glutCreateWindow("OpenGL Compute")
-
-  loadExtensions()
-
-  # Get the OpenGL version string
-  let versionString = $cast[cstring](glGetString(GL_VERSION))
-  echo "OpenGL Version: ", versionString
-
-  # Load the compute shader
-  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
-  glCompileShader(shaderModule)
-
-  checkShaderCompilation(shaderModule)
-
-  # Create the shader program
-  var shaderProgram = glCreateProgram()
-  glAttachShader(shaderProgram, shaderModule)
-  glLinkProgram(shaderProgram)
-
-  checkProgramLinking(shaderProgram)
-
-  # Use the program
-  glUseProgram(shaderProgram)
-
-  # Matrix dimensions
-  const M = 1024
-  const N = 2048
-  const P = 1024
-
-  # Create buffers
-  var bufferA, bufferB, bufferC: GLuint
-  glGenBuffers(1, bufferA.addr)
-  glGenBuffers(1, bufferB.addr)
-  glGenBuffers(1, bufferC.addr)
-
-  # Buffer size for each matrix
-  let bufferSizeA = M * N * sizeof(float32)
-  let bufferSizeB = N * P * sizeof(float32)
-  let bufferSizeC = M * P * sizeof(float32)
-
-  # Bind and initialize buffer A
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferA)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSizeA.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-  var bufferAPtr = cast[ptr array[M * N, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
-  for i in 0 ..< M * N:
-    bufferAPtr[i] = float32(i + 1)
-  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, bufferA)
-
-  # Bind and initialize buffer B
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferB)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSizeB.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-  var bufferBPtr = cast[ptr array[N * P, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
-  for i in 0 ..< N * P:
-    bufferBPtr[i] = float32(i + 1)
-  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bufferB)
-
-  # Bind and initialize buffer C (output)
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferC)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSizeC.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bufferC)
-
-  # Uniform buffer for matrix dimensions
-  var uniformBuffer: GLuint
-  glGenBuffers(1, uniformBuffer.addr)
-  glBindBuffer(GL_UNIFORM_BUFFER, uniformBuffer)
-  glBufferData(GL_UNIFORM_BUFFER, (3 * sizeof(uint32)).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-  var uniformBufferPtr = cast[ptr array[3, uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
-  uniformBufferPtr[0] = M.uint32
-  uniformBufferPtr[1] = N.uint32
-  uniformBufferPtr[2] = P.uint32
-  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
-  glBindBufferBase(GL_UNIFORM_BUFFER, 3, uniformBuffer)
-
-  # Dispatch the compute shader
-  let t0 = cpuTime()
-  glDispatchCompute(ceilDiv(M, workgroupSize.x).GLuint, ceilDiv(P, workgroupSize.y).GLuint, 1)
-
-  # Synchronize and read back the results
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
-
-  let t1 = cpuTime()
-  var bufferCPtr = cast[ptr array[M * P, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  let t2 = cpuTime()
-  doAssert checkRandomSamples(bufferCPtr[], M, N, P, 100)
-  let t3 = cpuTime()
-  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
-
-  template ff(f: float, prec: int = 4): string =
-    formatFloat(f*1000, ffDecimal, prec) # ms
-
-  echo "Process: ", ff(t1-t0), " Map: ", ff(t2-t1), " Read: ", ff(t3-t2)
-
-  # Clean up
-  glDeleteProgram(shaderProgram)
-  glDeleteShader(shaderModule)
-  glDeleteBuffers(1, bufferA.addr)
-  glDeleteBuffers(1, bufferB.addr)
-  glDeleteBuffers(1, bufferC.addr)
+  var resources: MatrixMultiplication
+  try:
+    initOpenGLContext()
+    resources = initResources()
+    let start = cpuTime()
+    dispatchComputeShader(resources)
+    let result = readResults(resources)
+    let duration = cpuTime() - start
+    doAssert checkRandomSamples(result, M, N, P, 100)
+    echo "Runtime: ", formatFloat(duration*1000, ffDecimal, 4), " ms"
+  finally:
+    cleanup(resources)
 
 main()
