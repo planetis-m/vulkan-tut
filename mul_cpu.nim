@@ -121,7 +121,7 @@ proc main =
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, buffers, alpha, beta,
-                  transposeA = false, transposeB = false, M, K, N, localSize)
+                  transposeA = true, transposeB = false, M, K, N, localSize)
 
   unprotected buffers as b:
     # Verify the result
@@ -129,7 +129,7 @@ proc main =
       for j in 0..<N:
         var expected: float32 = 0
         for k in 0..<K:
-          expected += alpha * b.A[i * K + k] * b.B[k * N + j]
+          expected += alpha * b.A[i + k * M] * b.B[k * N + j]
         expected += beta * b.C[i * N + j]
         assert b.C[i * N + j] == expected,
             "Mismatch at C[$1, $2]: expected $3, got $4".format(i, j, expected, b.C[i * N + j])
