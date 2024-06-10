@@ -39,10 +39,12 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
     # Load tiles into shared memory
     unprotected buffers as b:
       if globalRow < M and (tileIndex * tileSize + localCol) < K:
+        # if transposeA: b.A[(tileIndex * tileSize + localCol) * M + globalRow]
         smem.sharedA[localRow * tileSize + localCol] = b.A[globalRow * K + tileIndex * tileSize + localCol]
       else:
         smem.sharedA[localRow * tileSize + localCol] = 0
       if globalCol < N and (tileIndex * tileSize + localRow) < K:
+        # if transposeB: b.B[globalCol * K + tileIndex * tileSize + localRow]
         smem.sharedB[localCol * tileSize + localRow] = b.B[(tileIndex * tileSize + localRow) * N + globalCol]
       else:
         smem.sharedB[localCol * tileSize + localRow] = 0

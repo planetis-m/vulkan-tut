@@ -198,6 +198,10 @@ proc readResults(resources: MatrixMultiplication): seq[float32] =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 proc computeElement(m, n, p, row, col: int): float32 =
+  # See the "Compute the partial product of each tile" part of the compute shader.
+  # Different order of operations between the GPU and the host version
+  # results in intermediate rounding errors being introduced
+  # and accumulated in a certain order.
   result = 0
   for k in 0..<n:
     result += float32(row * n + k) * float32(k * p + col)
@@ -207,9 +211,6 @@ proc checkRandomSamples(shaderResult: seq[float32], m, n, p, numSamples: int): b
     let row = rand(m-1)
     let col = rand(p-1)
     let cpuResult = computeElement(m, n, p, row, col)
-    # Different order of operations between the GPU and the host version.
-    # This results in intermediate rounding errors being introduced
-    # and accumulated in a certain order.
     if abs(shaderResult[row * p + col] - cpuResult) >= 1e-4:
       return false
   result = true
