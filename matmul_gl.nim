@@ -61,11 +61,11 @@ void main() {
 
     // Compute the partial product for this tile
     for (uint j = 0; j < TILE_SIZE; j += 4) {
-      vec4 a_tmp = vec4(sharedA[localRow * TILE_SIZE + j], sharedA[localRow * TILE_SIZE + j+1], sharedA[localRow * TILE_SIZE + j+2], sharedA[localRow * TILE_SIZE + j+3]);
-      sum += a_tmp[0] * sharedB[j * TILE_SIZE + localCol];
-      sum += a_tmp[1] * sharedB[(j+1) * TILE_SIZE + localCol];
-      sum += a_tmp[2] * sharedB[(j+2) * TILE_SIZE + localCol];
-      sum += a_tmp[3] * sharedB[(j+3) * TILE_SIZE + localCol];
+      vec4 tmpA = vec4(sharedA[localRow * TILE_SIZE + j], sharedA[localRow * TILE_SIZE + j+1], sharedA[localRow * TILE_SIZE + j+2], sharedA[localRow * TILE_SIZE + j+3]);
+      sum += tmpA.x * sharedB[j * TILE_SIZE + localCol];
+      sum += tmpA.y * sharedB[(j+1) * TILE_SIZE + localCol];
+      sum += tmpA.z * sharedB[(j+2) * TILE_SIZE + localCol];
+      sum += tmpA.w * sharedB[(j+3) * TILE_SIZE + localCol];
     }
 
     // Wait for all threads to finish using current tiles before loading new tiles
