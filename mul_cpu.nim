@@ -25,10 +25,11 @@ proc getHandle*(b: var Barrier): BarrierHandle {.inline.} =
 proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
 
-proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
-                 buffers: Locker[tuple[A, B, C: seq[float32]]],
-                 smem: ptr[tuple[sharedA, sharedB: seq[float32]]],
-                 alpha, beta: float32, M, K, N, tileSize: int) {.gcsafe.} =
+proc sgemmShader(env: GlEnvironment; barrier: BarrierHandle;
+                 buffers: Locker[tuple[A, B, C: seq[float32]]];
+                 smem: ptr[tuple[sharedA, sharedB: seq[float32]]];
+                 alpha, beta: float32; transposeA, transposeB: bool;
+                 M, K, N, tileSize: int) {.gcsafe.} =
   let localRow = env.gl_LocalInvocationID.x.int
   let localCol = env.gl_LocalInvocationID.y.int
   let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localRow
@@ -39,13 +40,15 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
     # Load tiles into shared memory
     unprotected buffers as b:
       if globalRow < M and (tileIndex * tileSize + localCol) < K:
-        # if transposeA: b.A[(tileIndex * tileSize + localCol) * M + globalRow]
-        smem.sharedA[localRow * tileSize + localCol] = b.A[globalRow * K + tileIndex * tileSize + localCol]
+        smem.sharedA[localRow * tileSize + localCol] =
+          if transposeA: b.A[(tileIndex * tileSize + localCol) * M + globalRow]
+          else: b.A[globalRow * K + tileIndex * tileSize + localCol]
       else:
         smem.sharedA[localRow * tileSize + localCol] = 0
       if globalCol < N and (tileIndex * tileSize + localRow) < K:
-        # if transposeB: b.B[globalCol * K + tileIndex * tileSize + localRow]
-        smem.sharedB[localCol * tileSize + localRow] = b.B[(tileIndex * tileSize + localRow) * N + globalCol]
+        smem.sharedB[localCol * tileSize + localRow] =
+          if transposeB: b.B[globalCol * K + tileIndex * tileSize + localRow]
+          else: b.B[(tileIndex * tileSize + localRow) * N + globalCol]
       else:
         smem.sharedB[localCol * tileSize + localRow] = 0
     # Wait for both tiles to be loaded in before doing computation
@@ -60,9 +63,9 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
     if globalRow < M and globalCol < N:
       b.C[globalRow * N + globalCol] = alpha * sum + beta * b.C[globalRow * N + globalCol]
 
-proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
-                     buffers: Locker[tuple[A, B, C: seq[float32]]], alpha, beta: float32,
-                     M, K, N, tileSize: int) =
+proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
+                     buffers: Locker[tuple[A, B, C: seq[float32]]]; alpha, beta: float32;
+                     transposeA, transposeB: bool; M, K, N, tileSize: int) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
   env.gl_WorkGroupSize = workGroupSize
@@ -87,7 +90,8 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
                   wgZ * workGroupSize.z + z
                 )
                 master.spawn sgemmShader(env, barrier.getHandle(), buffers,
-                                         addr shared, alpha, beta, M, K, N, tileSize)
+                                         addr shared, alpha, beta, transposeA, transposeB,
+                                         M, K, N, tileSize)
 
 # Main
 const
@@ -116,7 +120,8 @@ proc main =
   var buffers = initLocker (A: A, B: B, C: newSeq[float32](M * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, alpha, beta, M, K, N, localSize)
+  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, alpha, beta,
+                  transposeA = false, transposeB = false, M, K, N, localSize)
 
   unprotected buffers as b:
     # Verify the result
