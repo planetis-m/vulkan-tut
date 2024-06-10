@@ -35,7 +35,7 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
   let globalCol = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localCol
 
   var sum: float32 = 0
-  for tileIndex in countup(0, K div tileSize):
+  for tileIndex in countup(0, ceilDiv(K, tileSize)):
     # Load tiles into shared memory
     unprotected buffers as b:
       if globalRow < M and (tileIndex * tileSize + localCol) < K:
@@ -43,14 +43,14 @@ proc sgemmShader(env: GlEnvironment, barrier: BarrierHandle,
       else:
         smem.sharedA[localRow * tileSize + localCol] = 0
       if globalCol < N and (tileIndex * tileSize + localRow) < K:
-        smem.sharedB[localRow * tileSize + localCol] = b.B[(tileIndex * tileSize + localRow) * N + globalCol]
+        smem.sharedB[localCol * tileSize + localRow] = b.B[(tileIndex * tileSize + localRow) * N + globalCol]
       else:
-        smem.sharedB[localRow * tileSize + localCol] = 0
+        smem.sharedB[localCol * tileSize + localRow] = 0
     # Wait for both tiles to be loaded in before doing computation
     wait barrier
     # Compute the partial product for this tile
     for j in 0..<tileSize:
-      sum += smem.sharedA[localRow * tileSize + j] * smem.sharedB[j * tileSize + localCol]
+      sum += smem.sharedA[localRow * tileSize + j] * smem.sharedB[localCol * tileSize + j]
     # Wait for all threads to finish using current tiles before loading in new
     wait barrier
 

@@ -42,7 +42,7 @@ void main() {
 
   float sum = 0.0;
 
-  for (uint tileIndex = 0; tileIndex < K / TILE_SIZE; tileIndex++) {
+  for (uint tileIndex = 0; tileIndex < (K + TILE_SIZE - 1) / TILE_SIZE; tileIndex++) {
     // Load tiles into shared memory
     if (globalRow < M && (tileIndex * TILE_SIZE + localCol) < K) {
       sharedA[localRow * TILE_SIZE + localCol] = A[globalRow * K + tileIndex * TILE_SIZE + localCol];
@@ -51,9 +51,9 @@ void main() {
     }
 
     if (globalCol < N && (tileIndex * TILE_SIZE + localRow) < K) {
-      sharedB[localRow * TILE_SIZE + localCol] = B[(tileIndex * TILE_SIZE + localRow) * N + globalCol];
+      sharedB[localCol * TILE_SIZE + localRow] = B[(tileIndex * TILE_SIZE + localRow) * N + globalCol];
     } else {
-      sharedB[localRow * TILE_SIZE + localCol] = 0.0;
+      sharedB[localCol * TILE_SIZE + localRow] = 0.0;
     }
 
     // Wait for both tiles to be loaded before doing computation
@@ -62,10 +62,12 @@ void main() {
     // Compute the partial product for this tile
     for (uint j = 0; j < TILE_SIZE; j += 4) {
       vec4 tmpA = vec4(sharedA[localRow * TILE_SIZE + j], sharedA[localRow * TILE_SIZE + j+1], sharedA[localRow * TILE_SIZE + j+2], sharedA[localRow * TILE_SIZE + j+3]);
-      sum += tmpA.x * sharedB[j * TILE_SIZE + localCol];
-      sum += tmpA.y * sharedB[(j+1) * TILE_SIZE + localCol];
-      sum += tmpA.z * sharedB[(j+2) * TILE_SIZE + localCol];
-      sum += tmpA.w * sharedB[(j+3) * TILE_SIZE + localCol];
+      vec4 tmpB = vec4(sharedB[localCol * TILE_SIZE + j], sharedB[localCol * TILE_SIZE + j+1], sharedB[localCol * TILE_SIZE + j+2], sharedB[localCol * TILE_SIZE + j+3]);
+      //sum += dot(tmpA, tmpB);
+      sum += tmpA.x * tmpB.x;
+      sum += tmpA.y * tmpB.y;
+      sum += tmpA.z * tmpB.z;
+      sum += tmpA.w * tmpB.w;
     }
 
     // Wait for all threads to finish using current tiles before loading new tiles
@@ -76,7 +78,6 @@ void main() {
     C[globalRow * N + globalCol] = sum;
   }
 }
-
 """, WorkGroupSize)
 
 proc checkShaderCompilation(shader: GLuint) =
@@ -159,14 +160,14 @@ proc initResources(): MatrixMultiplication =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.bufferA)
   let bufferAPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<M*K:
-    bufferAPtr[i] = float32(i + 1)
+    bufferAPtr[i] = float32(i)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   result.bufferB = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeB, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.bufferB)
   let bufferBPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<K*N:
-    bufferBPtr[i] = float32(i + 1)
+    bufferBPtr[i] = float32(i)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   result.bufferC = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeC, nil, GL_DYNAMIC_DRAW)
@@ -199,14 +200,17 @@ proc readResults(resources: MatrixMultiplication): seq[float32] =
 proc computeElement(m, n, p, row, col: int): float32 =
   result = 0
   for k in 0..<n:
-    result += float32(row * n + k + 1) * float32(k * p + col + 1)
+    result += float32(row * n + k) * float32(k * p + col)
 
 proc checkRandomSamples(shaderResult: seq[float32], m, n, p, numSamples: int): bool =
   for i in 0..<numSamples:
     let row = rand(m-1)
     let col = rand(p-1)
     let cpuResult = computeElement(m, n, p, row, col)
-    if abs(shaderResult[row * p + col] - cpuResult) >= 1e-5:
+    # Different order of operations between the GPU and the host version.
+    # This results in intermediate rounding errors being introduced
+    # and accumulated in a certain order.
+    if abs(shaderResult[row * p + col] - cpuResult) >= 1e-4:
       return false
   result = true
 
