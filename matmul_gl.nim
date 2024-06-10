@@ -9,21 +9,21 @@ const
   ShaderCode = format("""
 #version 460
 
-layout(local_size_x = $1, local_size_y = $1) in;
+layout(local_size_x = $1, local_size_y = $1, local_size_z = 1) in;
 
-layout(std430, binding = 0) buffer ABuffer {
+layout(binding = 0) buffer ABuffer {
   float A[];
 };
 
-layout(std430, binding = 1) buffer BBuffer {
+layout(binding = 1) buffer BBuffer {
   float B[];
 };
 
-layout(std430, binding = 2) buffer CBuffer {
+layout(binding = 2) buffer CBuffer {
   float C[];
 };
 
-layout(std140, binding = 3) uniform Parameters {
+layout(binding = 3) uniform Parameters {
   int M;
   int K;
   int N;
