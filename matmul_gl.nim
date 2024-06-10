@@ -1,51 +1,83 @@
 import opengl, opengl/glut, std/[math, strutils, times, random]
 
 const
-  WorkGroupSizeX = 32
-  WorkGroupSizeY = 32
+  WorkGroupSize = 16
   M = 1024
-  N = 2048
-  P = 1024
+  K = 2048
+  N = 1024
 
   ShaderCode = format("""
 #version 460
 
-layout(local_size_x = $1, local_size_y = $2, local_size_z = 1) in;
+layout(local_size_x = $1, local_size_y = $1) in;
 
-layout(binding = 0) buffer MatrixA {
-  float dataA[];
+layout(std430, binding = 0) buffer ABuffer {
+  float A[];
 };
 
-layout(binding = 1) buffer MatrixB {
-  float dataB[];
+layout(std430, binding = 1) buffer BBuffer {
+  float B[];
 };
 
-layout(binding = 2) buffer MatrixC {
-  float dataC[];
+layout(std430, binding = 2) buffer CBuffer {
+  float C[];
 };
 
-layout(binding = 3) uniform MatrixSize {
-  uint M; // number of rows in A and C
-  uint N; // number of columns in A and rows in B
-  uint P; // number of columns in B and C
+layout(std140, binding = 3) uniform Parameters {
+  int M;
+  int K;
+  int N;
 };
+
+const uint TILE_SIZE = $1;
+
+shared float sharedA[TILE_SIZE * TILE_SIZE];
+shared float sharedB[TILE_SIZE * TILE_SIZE];
 
 void main() {
-  uint row = gl_GlobalInvocationID.x;
-  uint col = gl_GlobalInvocationID.y;
-  if (row < M && col < P) {
-    float sum = 0.0;
-    for (uint k = 0; k < N; k += 4) {
-      vec4 a_tmp = vec4(dataA[row * N + k], dataA[row * N + k+1], dataA[row * N + k+2], dataA[row * N + k+3]);
-      sum += a_tmp.x * dataB[k * P + col];
-      sum += a_tmp.y * dataB[(k+1) * P + col];
-      sum += a_tmp.z * dataB[(k+2) * P + col];
-      sum += a_tmp.w * dataB[(k+3) * P + col];
+  uint localRow = gl_LocalInvocationID.x;
+  uint localCol = gl_LocalInvocationID.y;
+  uint globalRow = gl_WorkGroupID.x * gl_WorkGroupSize.x + localRow;
+  uint globalCol = gl_WorkGroupID.y * gl_WorkGroupSize.y + localCol;
+
+  float sum = 0.0;
+
+  for (uint tileIndex = 0; tileIndex < K / TILE_SIZE; tileIndex++) {
+    // Load tiles into shared memory
+    if (globalRow < M && (tileIndex * TILE_SIZE + localCol) < K) {
+      sharedA[localRow * TILE_SIZE + localCol] = A[globalRow * K + tileIndex * TILE_SIZE + localCol];
+    } else {
+      sharedA[localRow * TILE_SIZE + localCol] = 0.0;
     }
-    dataC[row * P + col] = sum;
+
+    if (globalCol < N && (tileIndex * TILE_SIZE + localRow) < K) {
+      sharedB[localRow * TILE_SIZE + localCol] = B[(tileIndex * TILE_SIZE + localRow) * N + globalCol];
+    } else {
+      sharedB[localRow * TILE_SIZE + localCol] = 0.0;
+    }
+
+    // Wait for both tiles to be loaded before doing computation
+    barrier();
+
+    // Compute the partial product for this tile
+    for (uint j = 0; j < TILE_SIZE; j += 4) {
+      vec4 a_tmp = vec4(sharedA[localRow * TILE_SIZE + j], sharedA[localRow * TILE_SIZE + j+1], sharedA[localRow * TILE_SIZE + j+2], sharedA[localRow * TILE_SIZE + j+3]);
+      sum += a_tmp[0] * sharedB[j * TILE_SIZE + localCol];
+      sum += a_tmp[1] * sharedB[(j+1) * TILE_SIZE + localCol];
+      sum += a_tmp[2] * sharedB[(j+2) * TILE_SIZE + localCol];
+      sum += a_tmp[3] * sharedB[(j+3) * TILE_SIZE + localCol];
+    }
+
+    // Wait for all threads to finish using current tiles before loading new tiles
+    barrier();
+  }
+
+  if (globalRow < M && globalCol < N) {
+    C[globalRow * N + globalCol] = sum;
   }
 }
-""", WorkGroupSizeX, WorkGroupSizeY)
+
+""", WorkGroupSize)
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -119,21 +151,21 @@ proc initOpenGLContext() =
 
 proc initResources(): MatrixMultiplication =
   result.program = createComputeProgram(ShaderCode.cstring)
-  let bufferSizeA = M * N * sizeof(float32)
-  let bufferSizeB = N * P * sizeof(float32)
-  let bufferSizeC = M * P * sizeof(float32)
+  let bufferSizeA = M * K * sizeof(float32)
+  let bufferSizeB = K * N * sizeof(float32)
+  let bufferSizeC = M * N * sizeof(float32)
 
   result.bufferA = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeA, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.bufferA)
   let bufferAPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
-  for i in 0..<M*N:
+  for i in 0..<M*K:
     bufferAPtr[i] = float32(i + 1)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   result.bufferB = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeB, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.bufferB)
   let bufferBPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
-  for i in 0..<N*P:
+  for i in 0..<K*N:
     bufferBPtr[i] = float32(i + 1)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
@@ -143,8 +175,8 @@ proc initResources(): MatrixMultiplication =
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
   let uniformBufferPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
   uniformBufferPtr[0] = M.uint32
-  uniformBufferPtr[1] = N.uint32
-  uniformBufferPtr[2] = P.uint32
+  uniformBufferPtr[1] = K.uint32
+  uniformBufferPtr[2] = N.uint32
   discard glUnmapBuffer(GL_UNIFORM_BUFFER)
 
 proc dispatchComputeShader(resources: MatrixMultiplication) =
@@ -153,14 +185,14 @@ proc dispatchComputeShader(resources: MatrixMultiplication) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.bufferB)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, resources.bufferC)
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, resources.uniformBuffer)
-  glDispatchCompute(ceilDiv(M, WorkGroupSizeX).GLuint, ceilDiv(P, WorkGroupSizeY).GLuint, 1)
+  glDispatchCompute(ceilDiv(M, WorkGroupSize).GLuint, ceilDiv(N, WorkGroupSize).GLuint, 1)
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc readResults(resources: MatrixMultiplication): seq[float32] =
-  result = newSeq[float32](M * P)
+  result = newSeq[float32](M * N)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.bufferC)
   let bufferCPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  for i in 0..<M*P:
+  for i in 0..<M*N:
     result[i] = bufferCPtr[i]
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
@@ -188,8 +220,8 @@ proc main() =
     dispatchComputeShader(resources)
     let result = readResults(resources)
     let duration = cpuTime() - start
-    doAssert checkRandomSamples(result, M, N, P, 100)
     echo "Runtime: ", formatFloat(duration*1000, ffDecimal, 4), " ms"
+    doAssert checkRandomSamples(result, M, K, N, 100)
   finally:
     cleanup(resources)
 
