@@ -105,7 +105,7 @@ proc initResources(): Reduction =
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
   # Final result buffer
   result.resultBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(float32), nil, GL_STATIC_DRAW)
-  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), nil, GL_DYNAMIC_DRAW)
 
 proc performFirstReduction(resources: Reduction) =
   # Use the program

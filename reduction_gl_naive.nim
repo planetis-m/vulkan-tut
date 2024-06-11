@@ -103,7 +103,8 @@ proc initResources(): Reduction =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
-  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  # Uniform buffer
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
   let uniformBufferPtr = cast[ptr uint32](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
   uniformBufferPtr[] = NumElements
