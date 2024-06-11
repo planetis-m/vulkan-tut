@@ -13,12 +13,11 @@ const
   SpirvBinary = staticRead("build/shaders/shuffle.comp.spv")
 
 type
-  KeyElement = array[4, uint32] # last 3 uint32 are padding
-  KeySet = array[KeySetLength, KeyElement]
+  KeySet = array[KeySetLength, uint32]
 
 proc generateRandomKeys(keys: var KeySet, mask: uint32) =
   for i in 0..keys.high:
-    keys[i][0] = rand(uint32) and mask
+    keys[i] = rand(uint32) and mask
 
 proc calculateChecksum(x: openarray[uint32]): uint32 =
   result = 0
@@ -35,13 +34,6 @@ type
     program: GLuint
     buffer: GLuint
     uniform: GLuint
-
-  UniformBlock = object
-    keySet: KeySet
-    width: int32
-
-static:
-  assert (offsetOf(UniformBlock, width) and 4) == 0 # Ensure 4 byte alignment
 
 proc cleanup(x: RandomShuffle) =
   glDeleteBuffers(1, addr x.buffer)
@@ -63,14 +55,15 @@ proc initResources(): RandomShuffle =
   let bufferSize = NumElements*sizeof(float32)
   result.buffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSize, nil, GL_DYNAMIC_DRAW)
   # Generate random keys
-  var uniform = UniformBlock(width: Width.int32)
-  generateRandomKeys(uniform.keySet, uint32((1 shl Width) - 1))
-  result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(UniformBlock), nil, GL_DYNAMIC_DRAW)
+  var keySet: KeySet
+  generateRandomKeys(keySet, uint32((1 shl Width) - 1))
+  result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(KeySet)*4+sizeof(int32), nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniform)
-  let uniformPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY)
-  copyMem(uniformPtr, uniform.addr, sizeof(UniformBlock))
+  let uniformPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  for i in 0..keySet.high:
+    uniformPtr[i*4] = keySet[i] # Each array element is 16 byte aligned.
+  uniformPtr[keySet.len*4] = Width.uint32 # A scalar int is 4 byte aligned.
   discard glUnmapBuffer(GL_UNIFORM_BUFFER)
-  # glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(UniformBlock), addr uniform)
 
 proc dispatchComputeShader(resources: RandomShuffle) =
   glUseProgram(resources.program)
