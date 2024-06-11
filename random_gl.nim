@@ -1,7 +1,8 @@
-import opengl, opengl/glut, std/[stats, math]
+import opengl, opengl/glut, std/[stats, math, times, strutils]
 
 const
-  WorkgroupSizeX = 32
+  WorkgroupSize = 32
+  NumElements = 100_000
   SpirvBinary = staticRead("build/shaders/rand_normal.spv")
 
 type
@@ -37,7 +38,7 @@ proc loadShader[N: static int](shaderType: GLenum, spirvBinary: string,
     when N > 0:
       var indices: array[N, GLuint]
       var values: array[N, GLuint]
-      for i, constant in constants:
+      for i, constant in constants.pairs:
         indices[i] = constant.index
         values[i] = constant.value
       glSpecializeShader(result, entryPoint, constants.len.GLuint, indices[0].addr, values[0].addr)
@@ -58,8 +59,12 @@ proc createComputeProgram[N: static int](spirvBinary: string,
     finally:
       glDeleteShader(module)
 
-proc main =
-  # Create an OpenGL context and window
+proc createGPUBuffer(target: GLenum, size: GLsizeiptr, data: pointer, usage: GLenum): GLuint =
+  glGenBuffers(1, addr result)
+  glBindBuffer(target, result)
+  glBufferData(target, size, data, usage)
+
+proc initOpenGLContext() =
   var argc: int32 = 0
   glutInit(addr argc, nil)
   glutInitDisplayMode(GLUT_DOUBLE)
@@ -69,45 +74,38 @@ proc main =
   glutHideWindow()
   loadExtensions()
 
-  # Get the OpenGL version string
-  let versionString = $cast[cstring](glGetString(GL_VERSION))
-  echo "OpenGL Version: ", versionString
+type
+  RandomUniform = object
+    program: GLuint
+    buffer: GLuint
 
-  # Load the compute shader
-  let shaderProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSizeX.GLuint})
+proc cleanup(x: RandomUniform) =
+  glDeleteBuffers(1, addr x.buffer)
+  glDeleteProgram(x.program)
 
-  # Use the program
-  glUseProgram(shaderProgram)
+proc initResources(): RandomUniform =
+  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
+  let bufferSize = NumElements*sizeof(float32)
+  result.buffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSize, nil, GL_DYNAMIC_DRAW)
 
-  # Matrix dimensions
-  const NumElements = 100_000
-  # Buffer size for the matrix
-  const BufferSize = NumElements*sizeof(float32)
-
-  # Create buffer
-  var buffer: GLuint
-  glGenBuffers(1, buffer.addr)
-
-  # Bind the output buffer and allocate memory
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
-
-  # Bind the shader storage buffers
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
-
-  # Dispatch the compute shader
-  let numWorkgroupX = ceil(NumElements/WorkgroupSizeX.float32).GLuint
-  glDispatchCompute(numWorkgroupX, 1, 1)
-
-  # Synchronize and read back the results
+proc dispatchComputeShader(resources: RandomUniform) =
+  glUseProgram(resources.program)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.buffer)
+  glDispatchCompute(ceilDiv(NumElements, WorkgroupSize).GLuint, 1, 1)
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-  var rs: RunningStat
-  var bufferPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  for i in 0 ..< NumElements:
-    rs.push(bufferPtr[i])
+proc readResults(resources: RandomUniform): seq[float32] =
+  result = newSeq[float32](NumElements)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.buffer)
+  let bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  for i in 0..result.high:
+    result[i] = bufferPtr[i]
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
+proc checkRandom(shaderResult: seq[float32]) =
+  var rs: RunningStat
+  for i in 0 ..< shaderResult.len:
+    rs.push(shaderResult[i])
   doAssert abs(rs.mean) < 0.08, $rs.mean
   doAssert abs(rs.standardDeviation()-1.0) < 0.1
   let bounds = [3.5, 5.0]
@@ -115,8 +113,18 @@ proc main =
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
 
-  # Clean up
-  glDeleteProgram(shaderProgram)
-  glDeleteBuffers(1, buffer.addr)
+proc main =
+  var resources: RandomUniform
+  try:
+    initOpenGLContext()
+    resources = initResources()
+    let start = cpuTime()
+    dispatchComputeShader(resources)
+    let result = readResults(resources)
+    let duration = cpuTime() - start
+    echo "Runtime: ", formatFloat(duration*1000, ffDecimal, 4), " ms"
+    checkRandom(result)
+  finally:
+    cleanup(resources)
 
 main()
