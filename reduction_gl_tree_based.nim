@@ -1,67 +1,14 @@
-import opengl, opengl/glut, std/[strutils, times]
+import opengl, glut, glerrorcheck, std/[strutils, times]
 
 const
   WorkGroupSize = 256
-  NumElements = 262144 # Max problem size when MAX_COMPUTE_WORK_GROUP_SIZE (1024)
+  NumElements = 1048576 # Max problem size when MAX_COMPUTE_WORK_GROUP_SIZE (1024)
   NumWorkGroups = NumElements div WorkGroupSize
 
-  ShaderCode = """
-#version 460
+  SpirvBinary = staticRead("build/shaders/reduce.spv")
 
-layout(local_size_x = $1, local_size_y = 1, local_size_z = 1) in;
-
-shared float sharedData[$1];
-
-layout(binding = 0) buffer InputBuffer {
-  float inputData[];
-};
-
-layout(binding = 1) buffer OutputBuffer {
-  float outputData[];
-};
-
-void main() {
-  uint localIdx = gl_LocalInvocationID.x;
-  uint localSize = gl_WorkGroupSize.x;
-  uint globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx;
-
-  sharedData[localIdx] = 0;
-  while (globalIdx < n) {
-    sharedData[localIdx] += inputData[globalIdx] + inputData[globalIdx + localSize];
-    globalIdx += gl_NumWorkGroups.x;
-  }
-  barrier();
-
-  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
-    if (localIdx < stride) {
-      sharedData[localIdx] += sharedData[localIdx + stride];
-    }
-    memoryBarrierShared();
-  }
-
-  // Final reduction within each subgroup
-  if (localIdx < 64) {
-    sharedData[localIdx] += sharedData[localIdx + 64];
-    memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 32];
-    memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 16];
-    memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 8];
-    memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 4];
-    memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 2];
-    memoryBarrierShared();
-    sharedData[localIdx] += sharedData[localIdx + 1];
-    memoryBarrierShared();
-  }
-
-  if (localIdx == 0) {
-    outputData[gl_WorkGroupID.x] = sharedData[0];
-  }
-}
-"""
+type
+  SpecializationConstant = tuple[index, value: GLuint]
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -71,7 +18,7 @@ proc checkShaderCompilation(shader: GLuint) =
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetShaderInfoLog(shader, len, nil, cstring(log))
-    raise newException(GLerror, "Shader compilation error: " & log)
+    raise newException(GLError, "Shader compilation error: " & log)
 
 proc checkProgramLinking(program: GLuint) =
   var status: GLint
@@ -81,22 +28,32 @@ proc checkProgramLinking(program: GLuint) =
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetProgramInfoLog(program, len, nil, cstring(log))
-    raise newException(GLerror, "Program linking error: " & log)
+    raise newException(GLError, "Program linking error: " & log)
 
-proc loadShader(shaderType: GLenum, source: cstring): GLuint =
-  # Create and compile the compute shader
+proc loadShader[N: static int](shaderType: GLenum, spirvBinary: string,
+                constants: array[N, SpecializationConstant]): GLuint =
   result = glCreateShader(shaderType)
   if result != 0.GLUint:
-    glShaderSource(result, 1, cast[cstringArray](addr source), nil)
-    glCompileShader(result)
+    glShaderBinary(1, addr result, GL_SHADER_BINARY_FORMAT_SPIR_V,
+                   spirvBinary.cstring, spirvBinary.len.GLsizei)
+    let entryPoint = cstring"main"
+    when N > 0:
+      var indices: array[N, GLuint]
+      var values: array[N, GLuint]
+      for i, constant in constants.pairs:
+        indices[i] = constant.index
+        values[i] = constant.value
+      glSpecializeShader(result, entryPoint, constants.len.GLuint, indices[0].addr, values[0].addr)
+    else:
+      glSpecializeShader(result, entryPoint, 0, nil, nil)
     checkShaderCompilation(result)
 
-proc createComputeProgram(computeSource: cstring): GLuint =
-  let module = loadShader(GL_COMPUTE_SHADER, computeSource)
+proc createComputeProgram[N: static int](spirvBinary: string,
+                          constants: array[N, SpecializationConstant]): GLuint =
+  let module = loadShader(GL_COMPUTE_SHADER, spirvBinary, constants)
   if module != 0.GLUint:
     try:
       result = glCreateProgram()
-      # Create the shader program and link the compute shader
       if result != 0.GLUint:
         glAttachShader(result, module)
         glLinkProgram(result)
@@ -108,7 +65,6 @@ proc createGPUBuffer(target: GLenum, size: GLsizeiptr, data: pointer, usage: GLe
   glGenBuffers(1, addr result)
   glBindBuffer(target, result)
   glBufferData(target, size, data, usage)
-  checkGLerror()
 
 type
   Reduction = object
@@ -133,12 +89,12 @@ proc initOpenGLContext() =
   glutInitWindowSize(640, 480)
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
-  loadExtensions()
+  doAssert glInit(), "Failed to load OpenGL"
 
 proc initResources(): Reduction =
   # Create and compile the compute shader
-  result.firstReductionProgram = createComputeProgram(format(ShaderCode, WorkGroupSize).cstring)
-  result.finalReductionProgram = createComputeProgram(format(ShaderCode, NumWorkGroups).cstring)
+  result.firstReductionProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint, 1.GLuint: NumElements})
+  result.finalReductionProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint, 1.GLuint: NumWorkGroups})
   # Input buffer
   result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
