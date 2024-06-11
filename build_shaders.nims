@@ -6,5 +6,5 @@ task shaders, "Compile GLSL shaders to SPIR-V format":
     outputDir = "build/shaders"
   mkDir(outputDir)
   for f in listFiles(shaderDir):
-    if f.endsWith(".comp"):
+    if f.endsWith(".glsl"):
       exec "glslc -fshader-stage=comp " & f & " -o " & outputDir / splitFile(f).name & ".spv"

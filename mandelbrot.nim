@@ -282,7 +282,7 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
 
 proc createComputePipeline(x: var MandelbrotGenerator) =
   # Create the shader module
-  let computeShaderCode = readFile("build/shaders/mandelbrot.spv")
+  let computeShaderCode = readFile("build/shaders/mandelbrot.comp.spv")
   let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
     codeSize = computeShaderCode.len.uint,
     pCode = cast[ptr uint32](computeShaderCode[0].addr)

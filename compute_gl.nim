@@ -1,4 +1,4 @@
-import opengl, opengl/glut
+import opengl, glut
 
 proc main =
   # Create an OpenGL context and window
@@ -9,18 +9,16 @@ proc main =
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
 
-  loadExtensions()
+  doAssert glInit(), "Failed to load OpenGL"
 
   # Get the OpenGL version string
   let versionString = $cast[cstring](glGetString(GL_VERSION))
   echo "OpenGL Version: ", versionString
 
   # Load the compute shader
-  let shaderCode = readFile("shaders/square.comp")
+  let shaderCode = readFile("shaders/square.comp").cstring
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
+  glShaderSource(shaderModule, 1, addr shaderCode, nil)
   glCompileShader(shaderModule)
 
   # Create the shader program

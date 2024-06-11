@@ -1,66 +1,13 @@
-import opengl, opengl/glut
-import std/[math, strutils, times, random, bitops, tables]
+import
+  opengl, glut, glerrorcheck, glhelpers,
+  std/[math, strutils, times, random, bitops, tables]
 
 const
-  workgroupSizeX = 32
-
-  shaderCode = """
-// J-Y Park et al, https://eprint.iacr.org/2023/1889
-#version 460
-
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-
-const int HALF_ROUNDS = 10 / 2;
-const int KEY_SET_LENGTH = HALF_ROUNDS + 1;
-
-layout(binding = 0) buffer Res0 {
-  uint result[];
-};
-
-uniform uint key_set[KEY_SET_LENGTH];
-uniform int width;
-
-uint rotate_left(uint x, int bits, int width) {
-  return (x << bits) | (x >> (width - bits));
-}
-
-uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], const int width) {
-  const uint mask = (1 << width) - 1;
-  uint t = x;
-  for (int i = 0; i < HALF_ROUNDS; i++) {
-    t = (t + key_set[i]) & mask;
-    t = rotate_left(t, 1, width);
-  }
-  uint y = (t + key_set[HALF_ROUNDS]) & mask;
-  return y;
-}
-
-// Main function to execute compute shader
-void main() {
-  uint id = gl_GlobalInvocationID.x;
-  result[id] = arrhr(id, key_set, width);
-}
-"""
-
-proc checkShaderCompilation(shader: GLuint) =
-  var status: GLint
-  glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
-  if status == GL_FALSE.Glint:
-    var len: GLint
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
-    var log = newString(len)
-    glGetShaderInfoLog(shader, len, nil, cstring(log))
-    echo "Shader compilation error: ", log
-
-proc checkProgramLinking(program: GLuint) =
-  var status: GLint
-  glGetProgramiv(program, GL_LINK_STATUS, addr status)
-  if status == GL_FALSE.GLint:
-    var len: GLint
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
-    var log = newString(len)
-    glGetProgramInfoLog(program, len, nil, cstring(log))
-    echo "Program linking error: ", log
+  NumElements = 1048576 # 2^20
+  WorkgroupSize = 32
+  HalfRounds = 10 div 2
+  KeySetLength = HalfRounds + 1
+  SpirvBinary = staticRead("build/shaders/shuffle.comp.spv")
 
 proc generateRandomKeys(keys: var openarray[uint32], mask: uint32) =
   for i in 0..keys.high:
@@ -76,21 +23,26 @@ proc calculateHistogram(x: openarray[uint32]): CountTable[uint32] =
   for i in 0..x.high:
     inc result, x[i]
 
-proc main =
-  randomize(123)
-  # Create an OpenGL context and window
+proc initOpenGLContext() =
   var argc: int32 = 0
   glutInit(addr argc, nil)
   glutInitDisplayMode(GLUT_DOUBLE)
   glutInitWindowSize(640, 480)
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
+  glutHideWindow()
+  doAssert glInit(), "Failed to load OpenGL"
 
-  loadExtensions()
 
-  # Get the OpenGL version string
-  let versionString = $cast[cstring](glGetString(GL_VERSION))
-  echo "OpenGL Version: ", versionString
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, (3 * sizeof(uint32)).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
+  let uniformBufferPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  uniformBufferPtr[0] = M.uint32
+  uniformBufferPtr[1] = K.uint32
+  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
+
+proc main =
+  randomize(123)
 
   # Load the compute shader
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
@@ -110,8 +62,7 @@ proc main =
   glUseProgram(shaderProgram)
 
   # Create buffers
-  const NumElements = 1048576 # 2^20
-  const BufferSize = NumElements*sizeof(uint32)
+  const bufferSize = NumElements*sizeof(uint32)
 
   var buffer: GLuint
   glGenBuffers(1, buffer.addr)
@@ -122,9 +73,6 @@ proc main =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Generate random keys
-  const Rounds = 10
-  const KeySetLength = Rounds div 2 + 1
-
   var keySet: array[KeySetLength, uint32]
   # Calculate the width of the result array length
 
@@ -141,8 +89,7 @@ proc main =
 
   # Dispatch the compute shader
   let t0 = cpuTime()
-  const numWorkgroupX = ceilDiv(NumElements, workgroupSizeX).GLuint
-  glDispatchCompute(numWorkgroupX, 1, 1)
+  glDispatchCompute(ceilDiv(NumElements, workgroupSizeX).GLuint, 1, 1)
   checkGLerror()
 
   # Synchronize and read back the results

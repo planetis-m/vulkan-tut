@@ -1,9 +1,9 @@
-import opengl, opengl/glut, std/[stats, math, strutils, times]
+import opengl, glut, glhelpers, std/[stats, math, strutils, times]
 
 const
-  workgroupSizeX = 32
-
-  shaderCode = """
+  WorkgroupSize = 32
+  NumElements = 100_000
+  ShaderCode = """
 // https://www.shadertoy.com/view/ctj3Wc
 #version 460
 
@@ -49,26 +49,6 @@ void main() {
 }
 """
 
-proc checkShaderCompilation(shader: GLuint) =
-  var status: GLint
-  glGetShaderiv(shader, GL_COMPILE_STATUS, addr status)
-  if status == GL_FALSE.Glint:
-    var len: GLint
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
-    var log = newString(len)
-    glGetShaderInfoLog(shader, len, nil, cstring(log))
-    echo "Shader compilation error: ", log
-
-proc checkProgramLinking(program: GLuint) =
-  var status: GLint
-  glGetProgramiv(program, GL_LINK_STATUS, addr status)
-  if status == GL_FALSE.GLint:
-    var len: GLint
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
-    var log = newString(len)
-    glGetProgramInfoLog(program, len, nil, cstring(log))
-    echo "Program linking error: ", log
-
 proc main =
   # Create an OpenGL context and window
   var argc: int32 = 0
@@ -78,7 +58,7 @@ proc main =
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
 
-  loadExtensions()
+  doAssert glInit(), "Failed to load OpenGL"
 
   # Get the OpenGL version string
   let versionString = $cast[cstring](glGetString(GL_VERSION))
@@ -86,9 +66,8 @@ proc main =
 
   # Load the compute shader
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
+  var shaderCodeCStr = ShaderCode.cstring
+  glShaderSource(shaderModule, 1, addr shaderCodeCStr, nil)
   glCompileShader(shaderModule)
 
   checkShaderCompilation(shaderModule)
@@ -104,27 +83,25 @@ proc main =
   glUseProgram(shaderProgram)
 
   # Create buffers
-  const NumElements = 100_000
-  const BufferSize = NumElements*sizeof(float32)
+  let bufferSize = NumElements*sizeof(float32)
 
   var buffer: GLuint
   glGenBuffers(1, buffer.addr)
 
   # Bind the output buffer and allocate memory
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Dispatch the compute shader
   let t0 = cpuTime()
-  let numWorkgroupX = ceil(NumElements/(2*workgroupSizeX.float32)).GLuint
-  glDispatchCompute(numWorkgroupX, 1, 1)
+  glDispatchCompute(ceil(NumElements/(2*WorkgroupSize.float32)).GLuint, 1, 1)
 
   # Synchronize and read back the results
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
   let t1 = cpuTime()
-  var bufferPtr = cast[ptr array[NumElements, float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  var bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   let t2 = cpuTime()
   var rs: RunningStat
   for i in 0 ..< NumElements:
