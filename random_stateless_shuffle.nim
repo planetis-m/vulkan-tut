@@ -15,7 +15,7 @@ const
 type
   KeySet = array[KeySetLength, uint32]
 
-proc generateRandomKeys(keys: var openarray[uint32], mask: uint32) =
+proc generateRandomKeys(keys: var KeySet, mask: uint32) =
   for i in 0..keys.high:
     keys[i] = rand(uint32) and mask
 
@@ -36,7 +36,7 @@ type
     uniform: GLuint
 
   UniformBlock = object
-    keySet: array[KeySetLength, uint32]
+    keySet: KeySet
     width: int32
 
 static:
