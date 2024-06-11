@@ -1,4 +1,4 @@
-import opengl, opengl/glut, std/[stats, math, times, strutils]
+import opengl, glut, std/[stats, math, times, strutils]
 
 const
   WorkgroupSize = 32
@@ -7,6 +7,8 @@ const
 
 type
   SpecializationConstant = tuple[index, value: GLuint]
+
+  GLerror = object of Exception
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -72,7 +74,7 @@ proc initOpenGLContext() =
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
   glutHideWindow()
-  loadExtensions()
+  doAssert glInit(), "Failed to load OpenGL"
 
 type
   RandomUniform = object
@@ -94,24 +96,22 @@ proc dispatchComputeShader(resources: RandomUniform) =
   glDispatchCompute(ceilDiv(NumElements, WorkgroupSize).GLuint, 1, 1)
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-proc readResults(resources: RandomUniform): seq[float32] =
-  result = newSeq[float32](NumElements)
+proc checkResults(resources: RandomUniform) =
+  var rs: RunningStat
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.buffer)
   let bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  for i in 0..result.high:
-    result[i] = bufferPtr[i]
+  for i in 0..<NumElements:
+    rs.push(bufferPtr[i])
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
-
-proc checkRandom(shaderResult: seq[float32]) =
-  var rs: RunningStat
-  for i in 0 ..< shaderResult.len:
-    rs.push(shaderResult[i])
   doAssert abs(rs.mean) < 0.08, $rs.mean
   doAssert abs(rs.standardDeviation()-1.0) < 0.1
   let bounds = [3.5, 5.0]
   for a in [rs.max, -rs.min]:
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
+
+template ff(f: float, prec: int = 4): string =
+  formatFloat(f*1000, ffDecimal, prec) # ms
 
 proc main =
   var resources: RandomUniform
@@ -120,10 +120,9 @@ proc main =
     resources = initResources()
     let start = cpuTime()
     dispatchComputeShader(resources)
-    let result = readResults(resources)
+    checkResults(resources)
     let duration = cpuTime() - start
-    echo "Runtime: ", formatFloat(duration*1000, ffDecimal, 4), " ms"
-    checkRandom(result)
+    echo "Runtime: ", ff(duration), " ms"
   finally:
     cleanup(resources)
 
