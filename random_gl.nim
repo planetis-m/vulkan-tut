@@ -1,59 +1,8 @@
 import opengl, opengl/glut, std/[stats, math]
 
 const
-  workgroupSizeX = 32
-
-  shaderCode = """
-#version 460
-#extension GL_ARB_gpu_shader_int64 : require
-
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-
-layout(binding = 0) buffer Res0 {
-  float result[];
-};
-
-const uint64_t key = 0x87a93f1dc428be57UL;
-
-uint squares32(uint64_t ctr, uint64_t key) {
-  uint64_t x = ctr * key;
-  uint64_t y = x;
-  uint64_t z = y + key;
-  x = x * x + y;
-  x = (x >> 32u) | (x << 32u); // round 1
-  x = x * x + z;
-  x = (x >> 32u) | (x << 32u); // round 2
-  x = x * x + y;
-  x = (x >> 32u) | (x << 32u); // round 3
-  return uint((x * x + z) >> 32u); // round 4
-}
-
-float rand32(uint64_t ctr, uint64_t key, float max) {
-  uint x = squares32(ctr, key);
-  uint u = (0x7fU << 23U) | (x >> 9U);
-  return (uintBitsToFloat(u) - 1.0) * max;
-}
-
-// Generate Gaussian random numbers using the Ratio of Uniforms method.
-float normal(uint64_t ctr, uint64_t key, float mu, float sigma) {
-  float a, b;
-  do {
-    a = rand32(ctr, key, 1.0f);
-    b = rand32(ctr + 1UL, key, 1.0) * 1.7156 - 0.8573;
-    ctr += 2UL; // Increment within the loop to generate a new random number each iteration
-  } while (b * b > -4.0f * a * a * log(a));
-
-  return mu + sigma * (b / a);
-}
-
-// Main function to execute compute shader
-void main() {
-  uint id = gl_GlobalInvocationID.x;
-  uint64_t ctr = id * 1000UL + 123456789UL;
-  float tmp = normal(ctr, key, 0.0, 1.0);
-  result[id] = tmp;
-}
-"""
+  WorkgroupSizeX = 32
+  SpirvBinary = staticRead("build/shaders/rand_normal.spv")
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -83,7 +32,7 @@ proc main =
   glutInitWindowSize(640, 480)
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
-
+  glutHideWindow()
   loadExtensions()
 
   # Get the OpenGL version string
@@ -91,11 +40,16 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Load the compute shader
-  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  var shaderCodeCStr = allocCStringArray([shaderCode])
-  glShaderSource(shaderModule, 1, shaderCodeCStr, nil)
-  deallocCStringArray(shaderCodeCStr)
-  glCompileShader(shaderModule)
+  let spirvLength = SpirvBinary.len.GLsizei
+  let constantIndex = 0.GLuint
+  let constantValue = WorkGroupSizeX.GLuint
+  let shaderModule = glCreateShader(GL_COMPUTE_SHADER)
+  glShaderBinary(1, addr shaderModule, GL_SHADER_BINARY_FORMAT_SPIR_V, SpirvBinary.cstring, spirvLength)
+  glSpecializeShader(shaderModule, cstring"main", 1, addr constantIndex, addr constantValue)
+
+  # let shaderCode = readFile("shaders/rand_normal.comp")
+  # glShaderSource(shaderModule, 1, cast[cstringArray](addr shaderCode.cstring), nil)
+  # glCompileShader(shaderModule)
 
   checkShaderCompilation(shaderModule)
 
@@ -126,7 +80,7 @@ proc main =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
   # Dispatch the compute shader
-  let numWorkgroupX = ceil(NumElements/workgroupSizeX.float32).GLuint
+  let numWorkgroupX = ceil(NumElements/WorkgroupSizeX.float32).GLuint
   glDispatchCompute(numWorkgroupX, 1, 1)
 
   # Synchronize and read back the results
