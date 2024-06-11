@@ -13,7 +13,9 @@ layout(binding = 1) buffer OutputBuffer {
   float outputData[];
 };
 
-layout(constant_id = 1) const uint DATA_SIZE = 1024;
+layout(set = 0, binding = 2) uniform UniformBlock {
+  uint n;
+};
 
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
@@ -22,7 +24,7 @@ void main() {
   uint gridSize = localSize * 2 * gl_NumWorkGroups.x;
 
   float sum = 0;
-  while (globalIdx < DATA_SIZE) {
+  while (globalIdx < n) {
     sum += inputData[globalIdx] + inputData[globalIdx + localSize];
     inputData[globalIdx] = sum;
     globalIdx += gridSize;

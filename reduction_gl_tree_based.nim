@@ -2,7 +2,7 @@ import opengl, glut, glerrorcheck, std/[strutils, times]
 
 const
   WorkGroupSize = 256
-  NumElements = 1048576 # Max problem size when MAX_COMPUTE_WORK_GROUP_SIZE (1024)
+  NumElements = 1048576
   NumWorkGroups = NumElements div WorkGroupSize
 
   SpirvBinary = staticRead("build/shaders/reduce.spv")
@@ -73,11 +73,13 @@ type
     inputBuffer: GLuint
     outputBuffer: GLuint
     resultBuffer: GLuint
+    uniformBuffer: GLuint
 
 proc cleanup(x: Reduction) =
   glDeleteBuffers(1, addr x.inputBuffer)
   glDeleteBuffers(1, addr x.outputBuffer)
   glDeleteBuffers(1, addr x.resultBuffer)
+  glDeleteBuffers(1, addr x.uniformBuffer)
   glDeleteProgram(x.finalReductionProgram)
   glDeleteProgram(x.firstReductionProgram)
 
@@ -93,8 +95,8 @@ proc initOpenGLContext() =
 
 proc initResources(): Reduction =
   # Create and compile the compute shader
-  result.firstReductionProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint, 1.GLuint: NumElements})
-  result.finalReductionProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint, 1.GLuint: NumWorkGroups})
+  result.firstReductionProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
+  result.finalReductionProgram = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
   # Input buffer
   result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
@@ -106,6 +108,7 @@ proc initResources(): Reduction =
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
   # Final result buffer
   result.resultBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(float32), nil, GL_STATIC_DRAW)
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
 
 proc performFirstReduction(resources: Reduction) =
   # Use the program
@@ -113,6 +116,12 @@ proc performFirstReduction(resources: Reduction) =
   # Bind the shader storage buffers
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
+
+  glBindBuffer(GL_UNIFORM_BUFFER, resources.uniformBuffer)
+  let uniformBufferPtr = cast[ptr uint32](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  uniformBufferPtr[] = NumElements
+  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
+  glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
   # Dispatch the compute shader
   glDispatchCompute(NumWorkGroups, 1, 1)
   # Ensure all work is done
@@ -124,6 +133,12 @@ proc performFinalReduction(resources: Reduction) =
   # Bind the shader storage buffer
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.outputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.resultBuffer)
+
+  glBindBuffer(GL_UNIFORM_BUFFER, resources.uniformBuffer)
+  let uniformBufferPtr = cast[ptr uint32](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  uniformBufferPtr[] = NumWorkGroups
+  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
+  glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
   # Dispatch the compute shader
   glDispatchCompute(1, 1, 1)
   # Ensure all work is done

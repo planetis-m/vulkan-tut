@@ -72,10 +72,12 @@ type
     program: GLuint
     inputBuffer: GLuint
     outputBuffer: GLuint
+    uniformBuffer: GLuint
 
 proc cleanup(x: Reduction) =
   glDeleteBuffers(1, addr x.inputBuffer)
   glDeleteBuffers(1, addr x.outputBuffer)
+  glDeleteBuffers(1, addr x.uniformBuffer)
   glDeleteProgram(x.program)
 
 proc initOpenGLContext() =
@@ -91,7 +93,7 @@ proc initOpenGLContext() =
 
 proc initResources(): Reduction =
   # Create and compile the compute shader
-  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint, 1.GLuint: NumElements})
+  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
   # Input buffer
   result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
@@ -101,6 +103,11 @@ proc initResources(): Reduction =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32).GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
+  let uniformBufferPtr = cast[ptr uint32](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  uniformBufferPtr[] = NumElements
+  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
 
 proc dispatchComputeShader(resources: Reduction) =
   # Use the program
@@ -108,6 +115,7 @@ proc dispatchComputeShader(resources: Reduction) =
   # Bind the shader storage buffers
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
+  glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
   # Dispatch the compute shader
   glDispatchCompute(NumWorkGroups, 1, 1)
   # Ensure all work is done
