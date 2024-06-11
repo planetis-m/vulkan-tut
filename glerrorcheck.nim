@@ -2,9 +2,9 @@ import opengl
 
 type
   GLError* = object of Exception
-    errorCode: GLenum
+    errorCode*: GLenum
 
-proc getGLErrorMessage(errorCode: GLenum): string =
+proc getGLErrorMessage*(errorCode: GLenum): string =
   case errorCode
   of GL_INVALID_ENUM:
     "An unacceptable value is specified for an enumerated argument."
@@ -31,4 +31,7 @@ proc checkGLError*() {.noinline.} =
   var errorCode = glGetError()
   if errorCode != GL_NO_ERROR:
     let errorMessage = getGLErrorMessage(errorCode)
-    raise newException(GLError, "OpenGL Error: " & errorMessage)
+    var exc = new(GLError)
+    exc.errorCode = errorCode
+    exc.msg = "OpenGL Error: " & errorMessage
+    raise exc

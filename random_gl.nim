@@ -1,4 +1,4 @@
-import opengl, glut, std/[stats, math, times, strutils]
+import opengl, glut, glerrorcheck, std/[stats, math, times, strutils]
 
 const
   WorkgroupSize = 32
@@ -6,7 +6,6 @@ const
   SpirvBinary = staticRead("build/shaders/rand_normal.spv")
 
 type
-  GLerror = object of Exception
   SpecializationConstant = tuple[index, value: GLuint]
 
 proc checkShaderCompilation(shader: GLuint) =
@@ -17,7 +16,7 @@ proc checkShaderCompilation(shader: GLuint) =
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetShaderInfoLog(shader, len, nil, cstring(log))
-    raise newException(GLerror, "Shader compilation error: " & log)
+    raise newException(GLError, "Shader compilation error: " & log)
 
 proc checkProgramLinking(program: GLuint) =
   var status: GLint
@@ -27,7 +26,7 @@ proc checkProgramLinking(program: GLuint) =
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, addr len)
     var log = newString(len)
     glGetProgramInfoLog(program, len, nil, cstring(log))
-    raise newException(GLerror, "Program linking error: " & log)
+    raise newException(GLError, "Program linking error: " & log)
 
 proc loadShader[N: static int](shaderType: GLenum, spirvBinary: string,
                 constants: array[N, SpecializationConstant]): GLuint =
