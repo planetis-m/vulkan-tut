@@ -1,84 +1,16 @@
-import opengl, opengl/glut, std/[math, strutils, times, random]
+import opengl, glut, std/[math, strutils, times, random]
+
+type
+  GLerror = object of Exception
+  SpecializationConstant = tuple[index, value: GLuint]
 
 const
   WorkGroupSize = 16
+  SpirvBinary = staticRead("build/shaders/matrix_mul_tiled.spv")
+
   M = 1024
   K = 2048
   N = 1024
-
-  ShaderCode = format("""
-#version 460
-
-layout(local_size_x = $1, local_size_y = $1, local_size_z = 1) in;
-
-layout(binding = 0) buffer ABuffer {
-  float A[];
-};
-
-layout(binding = 1) buffer BBuffer {
-  float B[];
-};
-
-layout(binding = 2) buffer CBuffer {
-  float C[];
-};
-
-layout(binding = 3) uniform Parameters {
-  int M;
-  int K;
-  int N;
-};
-
-const uint TILE_SIZE = $1;
-
-shared float sharedA[TILE_SIZE * TILE_SIZE];
-shared float sharedB[TILE_SIZE * TILE_SIZE];
-
-void main() {
-  uint localRow = gl_LocalInvocationID.x;
-  uint localCol = gl_LocalInvocationID.y;
-  uint globalRow = gl_WorkGroupID.x * gl_WorkGroupSize.x + localRow;
-  uint globalCol = gl_WorkGroupID.y * gl_WorkGroupSize.y + localCol;
-
-  float sum = 0.0;
-
-  for (uint tileIndex = 0; tileIndex < (K + TILE_SIZE - 1) / TILE_SIZE; tileIndex++) {
-    // Load tiles into shared memory
-    if (globalRow < M && (tileIndex * TILE_SIZE + localCol) < K) {
-      sharedA[localRow * TILE_SIZE + localCol] = A[globalRow * K + tileIndex * TILE_SIZE + localCol];
-    } else {
-      sharedA[localRow * TILE_SIZE + localCol] = 0.0;
-    }
-
-    if (globalCol < N && (tileIndex * TILE_SIZE + localRow) < K) {
-      sharedB[localCol * TILE_SIZE + localRow] = B[(tileIndex * TILE_SIZE + localRow) * N + globalCol];
-    } else {
-      sharedB[localCol * TILE_SIZE + localRow] = 0.0;
-    }
-
-    // Wait for both tiles to be loaded before doing computation
-    barrier();
-
-    // Compute the partial product for this tile
-    for (uint j = 0; j < TILE_SIZE; j += 4) {
-      vec4 tmpA = vec4(sharedA[localRow * TILE_SIZE + j], sharedA[localRow * TILE_SIZE + j+1], sharedA[localRow * TILE_SIZE + j+2], sharedA[localRow * TILE_SIZE + j+3]);
-      vec4 tmpB = vec4(sharedB[localCol * TILE_SIZE + j], sharedB[localCol * TILE_SIZE + j+1], sharedB[localCol * TILE_SIZE + j+2], sharedB[localCol * TILE_SIZE + j+3]);
-      //sum += dot(tmpA, tmpB);
-      sum += tmpA.x * tmpB.x;
-      sum += tmpA.y * tmpB.y;
-      sum += tmpA.z * tmpB.z;
-      sum += tmpA.w * tmpB.w;
-    }
-
-    // Wait for all threads to finish using current tiles before loading new tiles
-    barrier();
-  }
-
-  if (globalRow < M && globalCol < N) {
-    C[globalRow * N + globalCol] = sum;
-  }
-}
-""", WorkGroupSize)
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
@@ -100,15 +32,27 @@ proc checkProgramLinking(program: GLuint) =
     glGetProgramInfoLog(program, len, nil, cstring(log))
     raise newException(GLerror, "Program linking error: " & log)
 
-proc loadShader(shaderType: GLenum, source: cstring): GLuint =
+proc loadShader[N: static int](shaderType: GLenum, spirvBinary: string,
+                constants: array[N, SpecializationConstant]): GLuint =
   result = glCreateShader(shaderType)
   if result != 0.GLUint:
-    glShaderSource(result, 1, cast[cstringArray](addr source), nil)
-    glCompileShader(result)
+    glShaderBinary(1, addr result, GL_SHADER_BINARY_FORMAT_SPIR_V,
+                   spirvBinary.cstring, spirvBinary.len.GLsizei)
+    let entryPoint = cstring"main"
+    when N > 0:
+      var indices: array[N, GLuint]
+      var values: array[N, GLuint]
+      for i, constant in constants.pairs:
+        indices[i] = constant.index
+        values[i] = constant.value
+      glSpecializeShader(result, entryPoint, constants.len.GLuint, indices[0].addr, values[0].addr)
+    else:
+      glSpecializeShader(result, entryPoint, 0, nil, nil)
     checkShaderCompilation(result)
 
-proc createComputeProgram(computeSource: cstring): GLuint =
-  let module = loadShader(GL_COMPUTE_SHADER, computeSource)
+proc createComputeProgram[N: static int](spirvBinary: string,
+                          constants: array[N, SpecializationConstant]): GLuint =
+  let module = loadShader(GL_COMPUTE_SHADER, spirvBinary, constants)
   if module != 0.GLUint:
     try:
       result = glCreateProgram()
@@ -123,7 +67,6 @@ proc createGPUBuffer(target: GLenum, size: GLsizeiptr, data: pointer, usage: GLe
   glGenBuffers(1, addr result)
   glBindBuffer(target, result)
   glBufferData(target, size, data, usage)
-  checkGLerror()
 
 type
   MatrixMultiplication = object
@@ -148,10 +91,10 @@ proc initOpenGLContext() =
   glutInitWindowPosition(50, 50)
   discard glutCreateWindow("OpenGL Compute")
   glutHideWindow()
-  loadExtensions()
+  doAssert glInit(), "Failed to load OpenGL"
 
 proc initResources(): MatrixMultiplication =
-  result.program = createComputeProgram(ShaderCode.cstring)
+  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
   let bufferSizeA = M * K * sizeof(float32)
   let bufferSizeB = K * N * sizeof(float32)
   let bufferSizeC = M * N * sizeof(float32)

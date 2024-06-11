@@ -6,9 +6,8 @@ const
   SpirvBinary = staticRead("build/shaders/rand_normal.spv")
 
 type
-  SpecializationConstant = tuple[index, value: GLuint]
-
   GLerror = object of Exception
+  SpecializationConstant = tuple[index, value: GLuint]
 
 proc checkShaderCompilation(shader: GLuint) =
   var status: GLint
