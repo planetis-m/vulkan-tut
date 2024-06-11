@@ -10,16 +10,16 @@ layout(binding = 0) buffer Res0 {
   uint result[];
 };
 
-layout(binding = 1) uniform Parameters {
+layout(set = 0, binding = 1) uniform UniformBlock {
   uint key_set[KEY_SET_LENGTH];
   int width;
 };
 
-uint rotate_left(uint x, int bits, int width) {
+uint rotate_left(const uint x, const int bits, const int width) {
   return (x << bits) | (x >> (width - bits));
 }
 
-uint arrhr(uint x, const uint key_set[KEY_SET_LENGTH], const int width) {
+uint arrhr(const uint x, const uint key_set[KEY_SET_LENGTH], const int width) {
   const uint mask = (1 << width) - 1;
   uint t = x;
   for (int i = 0; i < HALF_ROUNDS; i++) {

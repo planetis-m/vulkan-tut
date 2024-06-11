@@ -5,6 +5,11 @@ const
   NumElements = 100_000
   SpirvBinary = staticRead("build/shaders/rand_normal.comp.spv")
 
+type
+  RandomUniform = object
+    program: GLuint
+    buffer: GLuint
+
 proc initOpenGLContext() =
   var argc: int32 = 0
   glutInit(addr argc, nil)
@@ -14,11 +19,6 @@ proc initOpenGLContext() =
   discard glutCreateWindow("OpenGL Compute")
   glutHideWindow()
   doAssert glInit(), "Failed to load OpenGL"
-
-type
-  RandomUniform = object
-    program: GLuint
-    buffer: GLuint
 
 proc cleanup(x: RandomUniform) =
   glDeleteBuffers(1, addr x.buffer)

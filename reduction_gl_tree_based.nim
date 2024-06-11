@@ -55,7 +55,7 @@ proc performFirstReduction(resources: Reduction) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
   # Update the uniform data
   let uniformData = NumElements
-  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(uint32).GLsizeiptr, addr uniformData)
+  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(uint32), addr uniformData)
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
   # Dispatch the compute shader
   glDispatchCompute(NumWorkGroups, 1, 1)
@@ -70,7 +70,7 @@ proc performFinalReduction(resources: Reduction) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.resultBuffer)
   # Update the uniform data
   let uniformData = NumWorkGroups
-  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(uint32).GLsizeiptr, addr uniformData)
+  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(uint32), addr uniformData)
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
   # Dispatch the compute shader
   glDispatchCompute(1, 1, 1)
