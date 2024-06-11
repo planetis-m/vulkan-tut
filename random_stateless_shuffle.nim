@@ -3,7 +3,7 @@ import
   std/[math, strutils, times, random, bitops, tables]
 
 const
-  NumElements = 1048576 # 2^20
+  NumElements = 1024 # 2^20
   WorkgroupSize = 32
 
   HalfRounds = 10 div 2
@@ -13,11 +13,12 @@ const
   SpirvBinary = staticRead("build/shaders/shuffle.comp.spv")
 
 type
-  KeySet = array[KeySetLength, uint32]
+  KeyElement = array[4, uint32] # last 3 uint32 are padding
+  KeySet = array[KeySetLength, KeyElement]
 
 proc generateRandomKeys(keys: var KeySet, mask: uint32) =
   for i in 0..keys.high:
-    keys[i] = rand(uint32) and mask
+    keys[i][0] = rand(uint32) and mask
 
 proc calculateChecksum(x: openarray[uint32]): uint32 =
   result = 0
