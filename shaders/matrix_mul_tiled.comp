@@ -20,7 +20,7 @@ layout(binding = 3) uniform Parameters {
   int N;
 };
 
-layout(constant_id = 0) const uint TILE_SIZE = 32;
+layout(constant_id = 0) const uint TILE_SIZE = 16;
 
 shared float sharedA[TILE_SIZE * TILE_SIZE];
 shared float sharedB[TILE_SIZE * TILE_SIZE];
