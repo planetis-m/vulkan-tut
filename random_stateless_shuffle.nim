@@ -39,6 +39,9 @@ type
     keySet: array[KeySetLength, uint32]
     width: int32
 
+static:
+  assert (offsetOf(UniformBlock, width) and 4) == 0 # Ensure 4 byte alignment
+
 proc cleanup(x: RandomShuffle) =
   glDeleteBuffers(1, addr x.buffer)
   glDeleteBuffers(1, addr x.uniform)
@@ -60,14 +63,13 @@ proc initResources(): RandomShuffle =
   result.buffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSize, nil, GL_DYNAMIC_DRAW)
   # Generate random keys
   var uniform = UniformBlock(width: Width.int32)
-  # Calculate the width of the result array length
   generateRandomKeys(uniform.keySet, uint32((1 shl Width) - 1))
   result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(UniformBlock), nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniform)
-  # let uniformPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY)
-  # copyMem(uniformPtr, uniform.addr, sizeof(UniformBlock))
-  # discard glUnmapBuffer(GL_UNIFORM_BUFFER)
-  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(UniformBlock), addr uniform)
+  let uniformPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY)
+  copyMem(uniformPtr, uniform.addr, sizeof(UniformBlock))
+  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
+  # glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(UniformBlock), addr uniform)
 
 proc dispatchComputeShader(resources: RandomShuffle) =
   glUseProgram(resources.program)
