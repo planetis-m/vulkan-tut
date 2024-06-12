@@ -63,7 +63,7 @@ proc alignup(p: pointer, alignment: uint): pointer {.inline.} =
 template `+!`(p: pointer; diff: uint): pointer =
   cast[pointer](cast[uint](p) + diff)
 
-template `=!`(p: pointer; value: uint32) =
+template `{}=`(p: pointer; value: uint32) =
   cast[ptr uint32](p)[] = value
 
 proc initResources(): RandomShuffle =
@@ -72,16 +72,16 @@ proc initResources(): RandomShuffle =
   result.buffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSize, nil, GL_DYNAMIC_DRAW)
   # Generate random keys
   var keySet: KeySet
-  generateRandomKeys(keySet, uint32((1 shl Width) - 1))
+  generateRandomKeys(keySet, (1 shl Width) - 1)
   let size = alignup(KeySetLength * ArrayAlignment, ScalarAlignment) + sizeof(int32).uint
   result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, size.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniform)
   var uniformPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY)
   for i in 0..keySet.high:
-    uniformPtr =! keySet[i]
+    uniformPtr{} = keySet[i]
     uniformPtr = uniformPtr +! ArrayAlignment
   uniformPtr = alignup(uniformPtr, ScalarAlignment)
-  uniformPtr =! Width.uint32
+  uniformPtr{} = Width.uint32
   discard glUnmapBuffer(GL_UNIFORM_BUFFER)
 
 proc dispatchComputeShader(resources: RandomShuffle) =
