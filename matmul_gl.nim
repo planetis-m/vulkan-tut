@@ -1,7 +1,7 @@
 import opengl, glut, glhelpers, std/[math, random]
 
 const
-  WorkGroupSize = 16
+  WorkGroupSize = 32
   SpirvBinary = staticRead("build/shaders/matrix_mul_tiled.comp.spv")
 
   M = 1024
