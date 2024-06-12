@@ -1,4 +1,4 @@
-import opengl, glut, glerrors, glhelpers, std/[math, strutils, times, random]
+import opengl, glut, glerrors, glhelpers, std/[math, random]
 
 const
   WorkGroupSize = 16
@@ -69,8 +69,9 @@ proc dispatchComputeShader(resources: MatrixMultiplication) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.bufferB)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, resources.bufferC)
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, resources.uniformBuffer)
-  glDispatchCompute(ceilDiv(M, WorkGroupSize).GLuint, ceilDiv(N, WorkGroupSize).GLuint, 1)
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("Compute shader dispatch"):
+    glDispatchCompute(ceilDiv(M, WorkGroupSize).GLuint, ceilDiv(N, WorkGroupSize).GLuint, 1)
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc readResults(resources: MatrixMultiplication): seq[float32] =
   result = newSeq[float32](M * N)
@@ -104,11 +105,8 @@ proc main() =
   try:
     initOpenGLContext()
     resources = initResources()
-    let start = cpuTime()
     dispatchComputeShader(resources)
     let result = readResults(resources)
-    let duration = cpuTime() - start
-    echo "Runtime: ", formatFloat(duration*1000, ffDecimal, 4), " ms"
     doAssert checkRandomSamples(result, M, K, N, 100)
   finally:
     cleanup(resources)

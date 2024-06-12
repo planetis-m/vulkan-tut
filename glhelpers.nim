@@ -58,3 +58,26 @@ proc createGPUBuffer*(target: GLenum, size: GLsizeiptr, data: pointer, usage: GL
   glGenBuffers(1, addr result)
   glBindBuffer(target, result)
   glBufferData(target, size, data, usage)
+
+template profile*(name: string; body: untyped) =
+  # Create query objects
+  var startQuery, endQuery: GLuint
+  glGenQueries(1, addr startQuery)
+  glGenQueries(1, addr endQuery)
+  glQueryCounter(startQuery, GL_TIMESTAMP)
+  body
+  glQueryCounter(endQuery, GL_TIMESTAMP)
+  # Wait for the results
+  var done = 0.GLint
+  while done == 0.GLint:
+    glGetQueryObjectiv(endQuery, GL_QUERY_RESULT_AVAILABLE, addr done)
+  # Retrieve the query results
+  var startTime, endTime: GLuint64
+  glGetQueryObjectui64v(startQuery, GL_QUERY_RESULT, addr startTime)
+  glGetQueryObjectui64v(endQuery, GL_QUERY_RESULT, addr endTime)
+  # Calculate the elapsed time in nanoseconds
+  var elapsedTime = endTime - startTime
+  echo name, " time: ", elapsedTime.int / 1_000_000, " ms"
+  # Clean up
+  glDeleteQueries(1, addr startQuery)
+  glDeleteQueries(1, addr endQuery)

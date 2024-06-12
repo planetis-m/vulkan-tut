@@ -57,10 +57,11 @@ proc performFirstReduction(resources: Reduction) =
   let uniformData = NumElements
   glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(uint32), addr uniformData)
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
-  # Dispatch the compute shader
-  glDispatchCompute(NumWorkGroups, 1, 1)
-  # Ensure all work is done
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("First reduction compute shader dispatch"):
+    # Dispatch the compute shader
+    glDispatchCompute(NumWorkGroups, 1, 1)
+    # Ensure all work is done
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc performFinalReduction(resources: Reduction) =
   # Use the program
@@ -72,10 +73,11 @@ proc performFinalReduction(resources: Reduction) =
   let uniformData = NumWorkGroups
   glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(uint32), addr uniformData)
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
-  # Dispatch the compute shader
-  glDispatchCompute(1, 1, 1)
-  # Ensure all work is done
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("Final reduction compute shader dispatch"):
+    # Dispatch the compute shader
+    glDispatchCompute(1, 1, 1)
+    # Ensure all work is done
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc readResult(resources: Reduction): float32 =
   # Read back the result
@@ -96,7 +98,7 @@ proc main() =
     let duration = cpuTime()
     let result = readResult(resources)
     echo "Final reduction result: ", result
-    echo "Runtime: ", ff(duration)
+    echo "Total CPU Runtime: ", ff(duration), " ms"
   finally:
     cleanup(resources)
 

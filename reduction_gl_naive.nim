@@ -58,10 +58,11 @@ proc dispatchComputeShader(resources: Reduction) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
-  # Dispatch the compute shader
-  glDispatchCompute(NumWorkGroups, 1, 1)
-  # Ensure all work is done
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("Compute shader dispatch"):
+    # Dispatch the compute shader
+    glDispatchCompute(NumWorkGroups, 1, 1)
+    # Ensure all work is done
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc readResults(resources: Reduction): float32 =
   # Read back the results

@@ -1,6 +1,5 @@
 import
-  opengl, glut, glerrors, glhelpers,
-  std/[math, strutils, times, random, bitops, tables]
+  opengl, glut, glerrors, glhelpers, std/[math, random, bitops, tables]
 
 const
   NumElements = 1024 # 2^20
@@ -73,7 +72,7 @@ proc initResources(): RandomShuffle =
   # Generate random keys
   var keySet: KeySet
   generateRandomKeys(keySet, (1 shl Width) - 1)
-  let size = alignup(KeySetLength * ArrayAlignment, ScalarAlignment) + sizeof(int32).uint
+  let size = alignup(KeySetLength*ArrayAlignment, ScalarAlignment) + sizeof(int32).uint
   result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, size.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniform)
   var uniformPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY)
@@ -88,8 +87,9 @@ proc dispatchComputeShader(resources: RandomShuffle) =
   glUseProgram(resources.program)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.buffer)
   glBindBufferBase(GL_UNIFORM_BUFFER, 1, resources.uniform)
-  glDispatchCompute(ceilDiv(NumElements, WorkgroupSize).GLuint, 1, 1)
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("Compute shader dispatch"):
+    glDispatchCompute(ceilDiv(NumElements, WorkgroupSize).GLuint, 1, 1)
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc checkResults(resources: RandomShuffle) =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.buffer)
@@ -101,20 +101,14 @@ proc checkResults(resources: RandomShuffle) =
   # doAssert checksum == (NumElements - 1) * NumElements div 2
   doAssert histogram.len == NumElements
 
-template ff(f: float, prec: int = 4): string =
-  formatFloat(f*1000, ffDecimal, prec) # ms
-
 proc main =
   randomize(123)
   var resources: RandomShuffle
   try:
     initOpenGLContext()
     resources = initResources()
-    let start = cpuTime()
     dispatchComputeShader(resources)
     checkResults(resources)
-    let duration = cpuTime() - start
-    echo "Runtime: ", ff(duration), " ms"
   finally:
     cleanup(resources)
 

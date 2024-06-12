@@ -1,4 +1,4 @@
-import opengl, glut, glerrors, glhelpers, std/[stats, math, times, strutils]
+import opengl, glut, glerrors, glhelpers, std/[stats, math]
 
 const
   WorkgroupSize = 32
@@ -32,8 +32,9 @@ proc initResources(): RandomUniform =
 proc dispatchComputeShader(resources: RandomUniform) =
   glUseProgram(resources.program)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.buffer)
-  glDispatchCompute(ceilDiv(NumElements, WorkgroupSize).GLuint, 1, 1)
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("Compute shader dispatch"):
+    glDispatchCompute(ceilDiv(NumElements, WorkgroupSize).GLuint, 1, 1)
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc checkResults(resources: RandomUniform) =
   var rs: RunningStat
@@ -49,19 +50,13 @@ proc checkResults(resources: RandomUniform) =
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
 
-template ff(f: float, prec: int = 4): string =
-  formatFloat(f*1000, ffDecimal, prec) # ms
-
 proc main =
   var resources: RandomUniform
   try:
     initOpenGLContext()
     resources = initResources()
-    let start = cpuTime()
     dispatchComputeShader(resources)
     checkResults(resources)
-    let duration = cpuTime() - start
-    echo "Runtime: ", ff(duration), " ms"
   finally:
     cleanup(resources)
 

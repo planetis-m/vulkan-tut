@@ -1,4 +1,4 @@
-import opengl, glut, glhelpers, std/[stats, math, strutils, times]
+import opengl, glut, glhelpers, std/[stats, math]
 
 const
   WorkgroupSize = 32
@@ -102,20 +102,18 @@ proc main =
   glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer)
 
-  # Dispatch the compute shader
-  let t0 = cpuTime()
-  glDispatchCompute(ceilDiv(NumElements, 2*WorkgroupSize).GLuint, 1, 1)
+  profile("Compute shader dispatch"):
+    # Dispatch the compute shader
+    glDispatchCompute(ceilDiv(NumElements, 2*WorkgroupSize).GLuint, 1, 1)
+    # Synchronize and read back the results
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-  # Synchronize and read back the results
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+  profile("Map output buffer"):
+    var bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
 
-  let t1 = cpuTime()
-  var bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  let t2 = cpuTime()
   var rs: RunningStat
   for i in 0 ..< NumElements:
     rs.push(bufferPtr[i])
-  let t3 = cpuTime()
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   doAssert abs(rs.mean) < 0.08, $rs.mean
@@ -124,11 +122,6 @@ proc main =
   for a in [rs.max, -rs.min]:
     doAssert a >= bounds[0] and a <= bounds[1]
   rs.clear()
-
-  template ff(f: float, prec: int = 4): string =
-   formatFloat(f*1000, ffDecimal, prec) # ms
-
-  echo "Process: ", ff(t1-t0), " Map: ", ff(t2-t1), " Read: ", ff(t3-t2)
 
   # Clean up
   glDeleteProgram(shaderProgram)
