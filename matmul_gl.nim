@@ -103,7 +103,7 @@ proc main() =
     resources = initResources()
     dispatchComputeShader(resources)
     let result = readResults(resources)
-    doAssert checkRandomSamples(result, M, K, N, 100)
+    doAssert checkRandomSamples(result, M, K, N, 100_000)
   finally:
     cleanup(resources)
 
