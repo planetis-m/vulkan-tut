@@ -1,5 +1,5 @@
 import
-  opengl, glut, glerrors, glhelpers, std/[math, random, bitops, tables]
+  opengl, glut, glhelpers, std/[math, random, bitops, tables]
 
 const
   NumElements = 1024 # 2^20

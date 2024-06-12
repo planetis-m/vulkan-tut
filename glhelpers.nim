@@ -1,4 +1,4 @@
-import opengl, glerrors
+import opengl, glerrors, std/strutils
 
 type
   SpecializationConstant* = tuple[index, value: GLuint]
@@ -60,19 +60,22 @@ proc createGPUBuffer*(target: GLenum, size: GLsizeiptr, data: pointer, usage: GL
   glBufferData(target, size, data, usage)
 
 template profile*(name: string; body: untyped) =
-  # Create query object
-  var query: GLuint
-  glGenQueries(1, addr query)
-  glBeginQuery(GL_TIME_ELAPSED, query)
-  body
-  glEndQuery(GL_TIME_ELAPSED)
-  # Wait for the results
-  var done = 0.GLint
-  while done == 0.GLint:
-    glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, addr done)
-  # Retrieve the query results
-  var elapsedTime: GLuint64
-  glGetQueryObjectui64v(query, GL_QUERY_RESULT, addr elapsedTime)
-  echo name, " time: ", elapsedTime.int / 1_000_000, " ms"
-  # Clean up
-  glDeleteQueries(1, addr query)
+  when defined(skipProfile):
+    body
+  else:
+    # Create query object
+    var query: GLuint
+    glGenQueries(1, addr query)
+    glBeginQuery(GL_TIME_ELAPSED, query)
+    body
+    glEndQuery(GL_TIME_ELAPSED)
+    # Wait for the results
+    var done = 0.GLint
+    while done == 0.GLint:
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, addr done)
+    # Retrieve the query results
+    var elapsedTime: GLuint64
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, addr elapsedTime)
+    echo name, " time: ", formatFloat(elapsedTime.int / 1_000_000, ffDecimal, 4), " ms"
+    # Clean up
+    glDeleteQueries(1, addr query)

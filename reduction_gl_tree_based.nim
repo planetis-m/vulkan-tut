@@ -1,4 +1,4 @@
-import opengl, glut, glerrors, glhelpers, std/[strutils, times]
+import opengl, glut, glhelpers, std/[strutils, times]
 
 const
   WorkGroupSize = 256

@@ -1,5 +1,3 @@
-import opengl
-
 when defined(windows):
   const
     dllname = "(freeglut.dll|glut32.dll)"

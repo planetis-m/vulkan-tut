@@ -1,4 +1,4 @@
-import opengl, glut, glerrors, glhelpers, std/[stats, math]
+import opengl, glut, glhelpers, std/[stats, math]
 
 const
   WorkgroupSize = 32

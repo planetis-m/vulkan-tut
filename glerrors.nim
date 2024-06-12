@@ -1,7 +1,7 @@
 import opengl
 
 type
-  GLError* = object of Exception
+  GLError* = object of CatchableError
     errorCode*: GLenum
 
 proc getGLErrorMessage*(errorCode: GLenum): string =
