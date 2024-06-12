@@ -50,6 +50,22 @@ proc initOpenGLContext() =
   glutHideWindow()
   doAssert glInit(), "Failed to load OpenGL"
 
+const
+  ArrayAlignment = 16 # Each element is 16-byte aligned
+  ScalarAlignment = 4 # Scalars are 4-byte aligned
+
+proc alignup(value, alignment: uint): uint {.inline.} =
+  (value + alignment - 1) and not (alignment - 1)
+
+proc alignup(p: pointer, alignment: uint): pointer {.inline.} =
+  cast[pointer](alignup(cast[uint](p), alignment))
+
+template `+!`(p: pointer; diff: uint): pointer =
+  cast[pointer](cast[uint](p) + diff)
+
+template `=!`(p: pointer; value: uint32) =
+  cast[ptr uint32](p)[] = value
+
 proc initResources(): RandomShuffle =
   result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
   let bufferSize = NumElements*sizeof(float32)
@@ -57,12 +73,15 @@ proc initResources(): RandomShuffle =
   # Generate random keys
   var keySet: KeySet
   generateRandomKeys(keySet, uint32((1 shl Width) - 1))
-  result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(KeySet)*4+sizeof(int32), nil, GL_DYNAMIC_DRAW)
+  let size = alignup(KeySetLength * ArrayAlignment, ScalarAlignment) + sizeof(int32).uint
+  result.uniform = createGPUBuffer(GL_UNIFORM_BUFFER, size.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniform)
-  let uniformPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  var uniformPtr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY)
   for i in 0..keySet.high:
-    uniformPtr[i*4] = keySet[i] # Each array element is 16 byte aligned.
-  uniformPtr[keySet.len*4] = Width.uint32 # A scalar int is 4 byte aligned.
+    uniformPtr =! keySet[i]
+    uniformPtr = uniformPtr +! ArrayAlignment
+  uniformPtr = alignup(uniformPtr, ScalarAlignment)
+  uniformPtr =! Width.uint32
   discard glUnmapBuffer(GL_UNIFORM_BUFFER)
 
 proc dispatchComputeShader(resources: RandomShuffle) =
@@ -74,10 +93,10 @@ proc dispatchComputeShader(resources: RandomShuffle) =
 
 proc checkResults(resources: RandomShuffle) =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.buffer)
-  let bufferPtr = cast[ptr array[NumElements, uint32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  let bufferPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   # Checksum and histogram tests
-  # let checksum = calculateChecksum(bufferPtr[])
-  let histogram = calculateHistogram(bufferPtr[])
+  # let checksum = calculateChecksum(bufferPtr.toOpenArray(0, NumElements-1))
+  let histogram = calculateHistogram(bufferPtr.toOpenArray(0, NumElements-1))
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # doAssert checksum == (NumElements - 1) * NumElements div 2
   doAssert histogram.len == NumElements
