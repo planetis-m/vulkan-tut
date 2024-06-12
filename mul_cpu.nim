@@ -46,7 +46,7 @@ proc sgemmShader(env: GlEnvironment; barrier: BarrierHandle;
       else:
         smem.sharedA[localRow * tileSize + localCol] = 0
       if globalCol < N and (tileIndex * tileSize + localRow) < K:
-        smem.sharedB[localCol * tileSize + localRow] =
+        smem.sharedB[localRow * tileSize + localCol] =
           if transposeB: b.B[globalCol * K + tileIndex * tileSize + localRow]
           else: b.B[(tileIndex * tileSize + localRow) * N + globalCol]
       else:
@@ -55,7 +55,7 @@ proc sgemmShader(env: GlEnvironment; barrier: BarrierHandle;
     wait barrier
     # Compute the partial product for this tile
     for j in 0..<tileSize:
-      sum += smem.sharedA[localRow * tileSize + j] * smem.sharedB[localCol * tileSize + j]
+      sum += smem.sharedA[localRow * tileSize + j] * smem.sharedB[j * tileSize + localCol]
     # Wait for all threads to finish using current tiles before loading in new
     wait barrier
 
