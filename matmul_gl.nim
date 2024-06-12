@@ -82,10 +82,6 @@ proc readResults(resources: MatrixMultiplication): seq[float32] =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 proc computeElement(m, n, p, row, col: int): float32 =
-  # See the "Compute the partial product of each tile" part of the compute shader.
-  # Different order of operations between the GPU and the host version
-  # results in intermediate rounding errors being introduced
-  # and accumulated in a certain order.
   result = 0
   for k in 0..<n:
     result += float32(row * n + k) * float32(k * p + col)
