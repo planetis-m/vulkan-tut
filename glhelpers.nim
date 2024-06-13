@@ -29,16 +29,15 @@ proc loadShader*[N: static int](shaderType: GLenum, spirvBinary: string,
   if result != 0.GLUint:
     glShaderBinary(1, addr result, GL_SHADER_BINARY_FORMAT_SPIR_V,
                    spirvBinary.cstring, spirvBinary.len.GLsizei)
-    let entryPoint = cstring"main"
     when N > 0:
       var indices: array[N, GLuint]
       var values: array[N, GLuint]
       for i, constant in constants.pairs:
         indices[i] = constant.index
         values[i] = constant.value
-      glSpecializeShader(result, entryPoint, constants.len.GLuint, indices[0].addr, values[0].addr)
+      glSpecializeShader(result, "main", constants.len.GLuint, indices[0].addr, values[0].addr)
     else:
-      glSpecializeShader(result, entryPoint, 0, nil, nil)
+      glSpecializeShader(result, "main", 0, nil, nil)
     checkShaderCompilation(result)
 
 proc createComputeProgram*[N: static int](spirvBinary: string,

@@ -25,7 +25,8 @@ proc getGLErrorMessage*(errorCode: GLenum): string =
   of GL_TABLE_TOO_LARGE:
     "The specified table exceeds the implementation's maximum supported table size."
   else:
-    "Unknown error."
+    # assert errorCode != GL_NO_ERROR
+    "Unknown OpenGL error."
 
 proc checkGLError*() {.noinline.} =
   var errorCode = glGetError()

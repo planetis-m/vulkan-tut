@@ -182,11 +182,11 @@ proc createBuffers(x: var MandelbrotGenerator) =
   (x.storageBuffer, x.storageBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(float32)*4*x.width*x.height),
     VkBufferUsageFlags{VkBufferUsageFlagBits.StorageBufferBit},
-    VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit})
+    VkMemoryPropertyFlags{HostCoherentBit, HostVisibleBit})
   (x.uniformBuffer, x.uniformBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(int32)*2),
     VkBufferUsageFlags{VkBufferUsageFlagBits.UniformBufferBit},
-    VkMemoryPropertyFlags{HostCoherentBit, HostCoherentBit})
+    VkMemoryPropertyFlags{HostCoherentBit, HostVisibleBit})
   # Map the memory and write to the uniform buffer
   let mappedMemory = mapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
       VkDeviceSize(sizeof(int32)*2), 0.VkMemoryMapFlags)
