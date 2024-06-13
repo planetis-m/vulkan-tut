@@ -1,5 +1,5 @@
 # https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
-import opengl, glut, glerrors, glhelpers, std/[strutils, times]
+import opengl, glut, glerrors, glhelpers, std/[strformat, times]
 
 const
   WorkGroupSize = 256
@@ -73,9 +73,6 @@ proc readResults(resources: Reduction): float32 =
     result += outputDataPtr[i]
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
-template ff(f: float, prec: int = 4): string =
-  formatFloat(f, ffDecimal, prec)
-
 proc main() =
   var resources: Reduction
   try:
@@ -86,7 +83,7 @@ proc main() =
     let result = readResults(resources)
     let duration = cpuTime() - start
     echo "Final reduction result: ", result
-    echo "Total CPU runtime: ", ff(duration*1_000), " ms"
+    echo &"Total CPU runtime: {duration*1_000:.4f} ms"
   finally:
     cleanup(resources)
 

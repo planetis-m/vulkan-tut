@@ -1,4 +1,4 @@
-import opengl, glut, glhelpers, std/[strutils, times]
+import opengl, glut, glhelpers, std/[strformat, times]
 
 const
   WorkGroupSize = 256
@@ -84,9 +84,6 @@ proc readResult(resources: Reduction): float32 =
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.resultBuffer)
   glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float32), addr result)
 
-template ff(f: float, prec: int = 4): string =
-  formatFloat(f, ffDecimal, prec)
-
 proc main() =
   var resources: Reduction
   try:
@@ -98,7 +95,7 @@ proc main() =
     let duration = cpuTime() - start
     let result = readResult(resources)
     echo "Final reduction result: ", result
-    echo "Total CPU Runtime: ", ff(duration*1_000), " ms"
+    echo &"Total CPU runtime: {duration*1_000:.4f} ms"
   finally:
     cleanup(resources)
 
