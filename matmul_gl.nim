@@ -55,7 +55,7 @@ proc initResources(): MatrixMultiplication =
 
   result.bufferC = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, bufferSizeC, nil, GL_DYNAMIC_DRAW)
 
-  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, 3 * sizeof(uint32), nil, GL_DYNAMIC_DRAW)
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, 3*sizeof(uint32), nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
   let uniformBufferPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
   uniformBufferPtr[0] = M.uint32

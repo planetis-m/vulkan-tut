@@ -85,7 +85,7 @@ proc readResult(resources: Reduction): float32 =
   glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float32), addr result)
 
 template ff(f: float, prec: int = 4): string =
-  formatFloat(f*1000, ffDecimal, prec) # ms
+  formatFloat(f, ffDecimal, prec)
 
 proc main() =
   var resources: Reduction
@@ -95,10 +95,10 @@ proc main() =
     let start = cpuTime()
     performFirstReduction(resources)
     performFinalReduction(resources)
-    let duration = cpuTime()
+    let duration = cpuTime() - start
     let result = readResult(resources)
     echo "Final reduction result: ", result
-    echo "Total CPU Runtime: ", ff(duration), " ms"
+    echo "Total CPU Runtime: ", ff(duration*1_000), " ms"
   finally:
     cleanup(resources)
 

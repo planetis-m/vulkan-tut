@@ -74,7 +74,7 @@ proc readResults(resources: Reduction): float32 =
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 template ff(f: float, prec: int = 4): string =
-  formatFloat(f*1000, ffDecimal, prec) # ms
+  formatFloat(f, ffDecimal, prec)
 
 proc main() =
   var resources: Reduction
@@ -86,7 +86,7 @@ proc main() =
     let result = readResults(resources)
     let duration = cpuTime() - start
     echo "Final reduction result: ", result
-    echo "Runtime: ", ff(duration)
+    echo "Total CPU runtime: ", ff(duration*1_000), " ms"
   finally:
     cleanup(resources)
 
