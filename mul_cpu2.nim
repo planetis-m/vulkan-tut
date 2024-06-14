@@ -41,17 +41,18 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   for tileIndex in countup(0, ceilDiv(K, tileRatioK)):
     # Load tiles into shared memory
     unprotected buffers as b:
-      if (tileIndex * tileRatioK + localRow) < K:
-        sharedB[localRow * tileRatioK + localCol] = b.B[(tileIndex * tileRatioK + localRow) * N + globalCol]
+      if globalCol < N and (tileIndex * tileRatioK + localRow) < K:
+        sharedB[localCol * tileRatioK + localRow] = b.B[(tileIndex * tileRatioK + localRow) * N + globalCol]
       else:
         sharedB[localCol * tileRatioK + localRow] = 0
     # Wait for both tiles to be loaded in before doing computation
     wait barrier
-    for j in 0..<tileRatioK:
+    for i in 0..<tileRatioK:
       # Load tile of matrix M into register
       var aVal: float32 = 0
-      if globalRow < M and (tileIndex * tileRatioK + i) < K:
-        aVal = A[globalRow * K + tileIndex * tileRatioK + i]
+      unprotected buffers as b:
+        if globalRow < M and (tileIndex * tileRatioK + i) < K:
+          aVal = b.A[globalRow * K + tileIndex * tileRatioK + i]
       # Loop over and update the output elements
       for j in 0..<tileWidthN:
         if globalCol + j < N:
@@ -76,7 +77,7 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
       for wgX in 0 ..< numWorkGroups.x:
         env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
         # echo "New workgroup! id ", wgX, ", ", wgY
-        var shared = newSeq[float32](tileRationK * tileWidthN)
+        var shared = newSeq[float32](tileRatioK * tileWidthN)
 
         var barrier = createBarrier(workGroupSize.x * workGroupSize.y)
         var master = createMaster(activeProducer = true)
@@ -128,8 +129,8 @@ proc main =
       for j in 0..<N:
         var expected: float32 = 0
         for k in 0..<K:
-          expected += alpha * b.A[i * K + k] * b.B[k * N + j]
-        expected += beta * b.C[i * N + j]
+          expected += b.A[i * K + k] * b.B[k * N + j]
+        expected += b.C[i * N + j]
         assert b.C[i * N + j] == expected,
             "Mismatch at C[$1, $2]: expected $3, got $4".format(i, j, expected, b.C[i * N + j])
 
