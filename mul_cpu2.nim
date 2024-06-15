@@ -30,10 +30,10 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     buffers: Locker[tuple[A, B, C: seq[float32]]];
                     sharedB: ptr seq[float32]; M, K, N,
                     tileSizeB, tileSizeA, tileSizeRatio: int) {.gcsafe.} =
-  let localRow = env.gl_LocalInvocationID.y.int
-  let localCol = env.gl_LocalInvocationID.x.int
-  let globalRow = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localRow
-  let globalCol = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localCol
+  let i = env.gl_LocalInvocationID.x.int div tileSizeB
+  let j = env.gl_LocalInvocationID.x.int mod tileSizeB
+  let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + env.gl_LocalInvocationID.x.int
+  let globalCol = env.gl_WorkGroupID.y.int * tileSizeB
 
   var cReg = newSeq[float32](tileSizeB)
   # for i in 0..<tileSizeB:
@@ -41,22 +41,21 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   for tileIndex in countup(0, ceilDiv(K, tileSizeRatio)):
     # Load tiles into shared memory
     unprotected buffers as b:
-      if globalCol < N and (tileIndex * tileSizeRatio + localRow) < K:
-        sharedB[localRow * tileSizeB + localCol] = b.B[(tileIndex * tileSizeRatio + localRow) * N + globalCol]
+      if globalCol + j < N and (tileIndex * tileSizeRatio + i) < K:
+        sharedB[i * tileSizeB + j] = b.B[(tileIndex * tileSizeRatio + i) * N + globalCol + j]
       else:
-        sharedB[localRow * tileSizeB + localCol] = 0
+        sharedB[i * tileSizeB + j] = 0
     # Wait for both tiles to be loaded in before doing computation
     wait barrier
     for i in 0..<tileSizeRatio:
-      # Load tile of matrix M into register
-      var aVal: float32 = 0
+      # Load tile of matrix A into register
+      var aReg: float32 = 0
       unprotected buffers as b:
         if globalRow < M and (tileIndex * tileSizeRatio + i) < K:
-          aVal = b.A[globalRow * K + tileIndex * tileSizeRatio + i]
+          aReg = b.A[globalRow * K + tileIndex * tileSizeRatio + i]
       # Loop over and update the output elements
       for j in 0..<tileSizeB:
-        if globalCol + j < N:
-          cReg[j] += aVal * sharedB[i * tileSizeB + j]
+        cReg[j] += aReg * sharedB[i * tileSizeB + j]
     # Wait for all threads to finish using current tiles before loading in new
     wait barrier
 
@@ -107,8 +106,8 @@ const
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceilDiv(N, localSizeX).uint, ceilDiv(M, localSizeY).uint, 1)
-  let workGroupSize = uvec3(localSizeX, localSizeY, 1)
+  let numWorkGroups = uvec3(ceilDiv(M, localSizeX).uint, ceilDiv(N, localSizeY).uint, 1)
+  let workGroupSize = uvec3(localSizeX, 1, 1)
 
   # Initialize the matrices
   var A = newSeq[float32](M * K)
