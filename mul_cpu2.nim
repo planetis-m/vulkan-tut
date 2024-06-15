@@ -40,8 +40,8 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   for tileIndex in countup(0, ceilDiv(K, tileWidthRatioK)):
     # Load tiles into shared memory
     unprotected buffers as b:
-      if globalCol < N and (tileIndex * tileWidthRatioK + localCol) < K:
-        sharedB[localRow * tileWidthN + localCol] = b.B[(tileIndex * tileWidthRatioK + localCol) * N + globalCol]
+      if globalCol < N and (tileIndex * tileWidthRatioK + localRow) < K:
+        sharedB[localRow * tileWidthN + localCol] = b.B[(tileIndex * tileWidthRatioK + localRow) * N + globalCol]
       else:
         sharedB[localRow * tileWidthN + localCol] = 0
     # Wait for both tiles to be loaded in before doing computation
