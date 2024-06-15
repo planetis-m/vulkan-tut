@@ -29,7 +29,7 @@ proc wait*(m: BarrierHandle) {.inline.} =
 proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     buffers: Locker[tuple[A, B, C: seq[float32]]];
                     sharedB: ptr seq[float32]; M, K, N,
-                    tileSizeB, tileSizeA, tileSizeRatio: int) {.gcsafe.} =
+                    tileSizeA, tileSizeB, tileSizeRatio: int) {.gcsafe.} =
   let i = env.gl_LocalInvocationID.x.int div tileSizeB
   let j = env.gl_LocalInvocationID.x.int mod tileSizeB
   let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + env.gl_LocalInvocationID.x.int
@@ -66,7 +66,7 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
 
 proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
                      buffers: Locker[tuple[A, B, C: seq[float32]]]; M, K, N,
-                     tileSizeB, tileSizeA, tileSizeRatio: int) =
+                     tileSizeA, tileSizeB, tileSizeRatio: int) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
   env.gl_WorkGroupSize = workGroupSize
@@ -92,7 +92,7 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
                 )
                 master.spawn multiplyShader(env, barrier.getHandle(), buffers,
                                             addr shared, M, K, N,
-                                            tileSizeB, tileSizeA, tileSizeRatio)
+                                            tileSizeA, tileSizeB, tileSizeRatio)
 
 # Main
 const
@@ -100,14 +100,14 @@ const
   K = 16
   N = 32
 
-  localSizeX = 8 # workgroupSizeX
-  localSizeY = 2 # workgroupSizeY
-  localSizeRatio = localSizeX div localSizeY
+  localSizeA = 8
+  localSizeB = 2
+  localSizeRatio = localSizeA div localSizeB
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceilDiv(M, localSizeX).uint, ceilDiv(N, localSizeY).uint, 1)
-  let workGroupSize = uvec3(localSizeX, 1, 1)
+  let numWorkGroups = uvec3(ceilDiv(M, localSizeA).uint, ceilDiv(N, localSizeB).uint, 1)
+  let workGroupSize = uvec3(localSizeA, 1, 1)
 
   # Initialize the matrices
   var A = newSeq[float32](M * K)
@@ -122,7 +122,7 @@ proc main =
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, buffers,
-                  M, K, N, localSizeX, localSizeY, localSizeRatio)
+                  M, K, N, localSizeA, localSizeB, localSizeRatio)
 
   unprotected buffers as b:
     # Verify the result
