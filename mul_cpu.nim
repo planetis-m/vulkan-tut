@@ -30,10 +30,10 @@ proc sgemmShader(env: GlEnvironment; barrier: BarrierHandle;
                  smem: ptr[tuple[sharedA, sharedB: seq[float32]]];
                  alpha, beta: float32; transposeA, transposeB: bool;
                  M, K, N, tileSize: int) {.gcsafe.} =
-  let localRow = env.gl_LocalInvocationID.x.int
-  let localCol = env.gl_LocalInvocationID.y.int
-  let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localRow
-  let globalCol = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localCol
+  let localRow = env.gl_LocalInvocationID.y.int
+  let localCol = env.gl_LocalInvocationID.x.int
+  let globalRow = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localRow
+  let globalCol = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + localCol
 
   var sum: float32 = 0
   for tileIndex in countup(0, ceilDiv(K, tileSize)):
@@ -105,7 +105,7 @@ const
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceilDiv(M, localSize).uint, ceilDiv(N, localSize).uint, 1)
+  let numWorkGroups = uvec3(ceilDiv(N, localSize).uint, ceilDiv(M, localSize).uint, 1)
   let workGroupSize = uvec3(localSize, localSize, 1)
 
   # Initialize the matrices

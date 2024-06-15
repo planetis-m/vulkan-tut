@@ -26,10 +26,10 @@ shared float sharedA[TILE_SIZE * TILE_SIZE];
 shared float sharedB[TILE_SIZE * TILE_SIZE];
 
 void main() {
-  uint localRow = gl_LocalInvocationID.x;
-  uint localCol = gl_LocalInvocationID.y;
-  uint globalRow = gl_WorkGroupID.x * gl_WorkGroupSize.x + localRow;
-  uint globalCol = gl_WorkGroupID.y * gl_WorkGroupSize.y + localCol;
+  uint localRow = gl_LocalInvocationID.y;
+  uint localCol = gl_LocalInvocationID.x;
+  uint globalRow = gl_WorkGroupID.y * gl_WorkGroupSize.y + localRow;
+  uint globalCol = gl_WorkGroupID.x * gl_WorkGroupSize.x + localCol;
 
   float sum = 0.0;
   for (uint tileIndex = 0; tileIndex < (K + TILE_SIZE - 1) / TILE_SIZE; tileIndex++) {

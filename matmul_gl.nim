@@ -70,7 +70,7 @@ proc dispatchComputeShader(resources: MatrixMultiplication) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, resources.bufferC)
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, resources.uniformBuffer)
   profile("Compute shader dispatch"):
-    glDispatchCompute(ceilDiv(M, WorkGroupSize).GLuint, ceilDiv(N, WorkGroupSize).GLuint, 1)
+    glDispatchCompute(ceilDiv(N, WorkGroupSize).GLuint, ceilDiv(M, WorkGroupSize).GLuint, 1)
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc readResults(resources: MatrixMultiplication): seq[float32] =
