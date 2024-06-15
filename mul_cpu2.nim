@@ -37,7 +37,6 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   var cReg = newSeq[float32](tileWidthN)
   # for i in 0..<tileWidthN:
   #   cReg[i] = 0
-
   for tileIndex in countup(0, ceilDiv(K, tileWidthRatioK)):
     # Load tiles into shared memory
     unprotected buffers as b:
@@ -132,7 +131,6 @@ proc main =
         var expected: float32 = 0
         for k in 0..<K:
           expected += b.A[i * K + k] * b.B[k * N + j]
-        expected += b.C[i * N + j]
         assert b.C[i * N + j] == expected,
             "Mismatch at C[$1, $2]: expected $3, got $4".format(i, j, expected, b.C[i * N + j])
 
