@@ -1,8 +1,11 @@
 import opengl, glut, glhelpers, std/[math, random]
 
 const
-  WorkGroupSize = 32
-  SpirvBinary = staticRead("build/shaders/matrix_mul_tiled.comp.spv")
+  TileSizeA = 64
+  TileSizeB = 32
+  TileSizeRatio = TileSizeA div TileSizeB
+
+  SpirvBinary = staticRead("build/shaders/matrix_mul_joint.comp.spv")
 
   M = 1024
   K = 2048
@@ -34,7 +37,7 @@ proc initOpenGLContext() =
   doAssert glInit(), "Failed to load OpenGL"
 
 proc initResources(): MatrixMultiplication =
-  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
+  result.program = createComputeProgram(SpirvBinary, {0.GLuint: TileSizeA.GLuint, 1.GLuint: TileSizeB.GLuint})
   let bufferSizeA = M * K * sizeof(float32)
   let bufferSizeB = K * N * sizeof(float32)
   let bufferSizeC = M * N * sizeof(float32)
@@ -70,7 +73,7 @@ proc dispatchComputeShader(resources: MatrixMultiplication) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, resources.bufferC)
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, resources.uniformBuffer)
   profile("Compute shader dispatch"):
-    glDispatchCompute(ceilDiv(M, WorkGroupSize).GLuint, ceilDiv(N, WorkGroupSize).GLuint, 1)
+    glDispatchCompute(ceilDiv(M, TileSizeA).GLuint, ceilDiv(N, TileSizeB).GLuint, 1)
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
 proc readResults(resources: MatrixMultiplication): seq[float32] =

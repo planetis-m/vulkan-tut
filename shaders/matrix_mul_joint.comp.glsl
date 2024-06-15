@@ -27,7 +27,8 @@ const uint TILE_SIZE_RATIO = (TILE_SIZE_A / TILE_SIZE_B);
 shared float sharedB[TILE_SIZE_RATIO * TILE_SIZE_B];
 
 void main() {
-  uint globalRow = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+  uint localID = gl_LocalInvocationID.x;
+  uint globalRow = gl_WorkGroupID.x * gl_WorkGroupSize.x + localID;
   uint globalCol = gl_WorkGroupID.y * TILE_SIZE_B;
 
   float cReg[TILE_SIZE_B];
@@ -37,8 +38,8 @@ void main() {
 
   for (uint tileIndex = 0; tileIndex < (K + TILE_SIZE_RATIO - 1) / TILE_SIZE_RATIO; tileIndex++) {
     // Load tile into shared memory
-    const uint i = gl_LocalInvocationID.x / TILE_SIZE_B;
-    const uint j = gl_LocalInvocationID.x % TILE_SIZE_B;
+    const uint i = localID / TILE_SIZE_B;
+    const uint j = localID % TILE_SIZE_B;
     if (globalCol + j < N && (tileIndex * TILE_SIZE_RATIO + i) < K) {
       sharedB[i * TILE_SIZE_B + j] = B[(tileIndex * TILE_SIZE_RATIO + i) * N + globalCol + j];
     } else {
