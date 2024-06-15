@@ -128,9 +128,9 @@ proc main =
     for i in 0..<M:
       for j in 0..<N:
         var expected: float32 = 0
+        expected += beta * expected
         for k in 0..<K:
           expected += alpha * b.A[i + k * M] * b.B[k * N + j] # A is transposed
-        expected += beta * expected
         assert b.C[i * N + j] == expected,
             "Mismatch at C[$1, $2]: expected $3, got $4".format(i, j, expected, b.C[i * N + j])
 
