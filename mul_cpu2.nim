@@ -28,7 +28,7 @@ proc wait*(m: BarrierHandle) {.inline.} =
 proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     buffers: Locker[tuple[A, B, C: seq[float32]]];
                     sharedB: ptr seq[float32]; M, K, N,
-                    tileWidthM, tileWidthN, tileWidthRatioK: int) {.gcsafe.} =
+                    tileWidthN, tileWidthM, tileWidthRatioK: int) {.gcsafe.} =
   let localRow = env.gl_LocalInvocationID.y.int
   let localCol = env.gl_LocalInvocationID.x.int
   let globalRow = env.gl_WorkGroupID.y.int * env.gl_WorkGroupSize.y.int + localRow
@@ -41,7 +41,7 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   for tileIndex in countup(0, ceilDiv(K, tileWidthRatioK)):
     # Load tiles into shared memory
     unprotected buffers as b:
-      if (tileIndex * tileWidthRatioK + localCol) < K:
+      if globalCol < N and (tileIndex * tileWidthRatioK + localCol) < K:
         sharedB[localRow * tileWidthN + localCol] = b.B[(tileIndex * tileWidthRatioK + localCol) * N + globalCol]
       else:
         sharedB[localRow * tileWidthN + localCol] = 0
@@ -67,7 +67,7 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
 
 proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
                      buffers: Locker[tuple[A, B, C: seq[float32]]]; M, K, N,
-                     tileWidthM, tileWidthN, tileWidthRatioK: int) =
+                     tileWidthN, tileWidthM, tileWidthRatioK: int) =
   var env: GlEnvironment
   env.gl_NumWorkGroups = numWorkGroups
   env.gl_WorkGroupSize = workGroupSize
@@ -92,7 +92,8 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
                   wgZ * workGroupSize.z + z
                 )
                 master.spawn multiplyShader(env, barrier.getHandle(), buffers,
-                                            addr shared, M, K, N, tileWidthM, tileWidthN, tileWidthRatioK)
+                                            addr shared, M, K, N,
+                                            tileWidthN, tileWidthM, tileWidthRatioK)
 
 # Main
 const
