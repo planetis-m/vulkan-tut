@@ -50,7 +50,7 @@ void main() {
     barrier();
 
     // Compute the partial product for this tile
-    for (uint j = 0; j < TILE_SIZE; ++j) {
+    for (uint j = 0; j < TILE_SIZE; j++) {
       sum += sharedA[j * TILE_SIZE + localRow] * sharedB[j * TILE_SIZE + localCol];
     }
 

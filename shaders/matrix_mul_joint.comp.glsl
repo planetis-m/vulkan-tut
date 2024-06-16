@@ -28,8 +28,8 @@ shared float sharedB[TILE_SIZE_RATIO * TILE_SIZE_B];
 
 void main() {
   uint localID = gl_LocalInvocationID.x;
-  uint globalRow = gl_WorkGroupID.x * gl_WorkGroupSize.x + localID;
-  uint globalCol = gl_WorkGroupID.y * TILE_SIZE_B;
+  uint row = gl_WorkGroupID.x * gl_WorkGroupSize.x + localID;
+  uint col = gl_WorkGroupID.y * TILE_SIZE_B;
 
   float cReg[TILE_SIZE_B];
   for (uint i = 0; i < TILE_SIZE_B; i++) {
@@ -40,8 +40,8 @@ void main() {
     // Load tile into shared memory
     const uint i = localID / TILE_SIZE_B;
     const uint j = localID % TILE_SIZE_B;
-    if (globalCol + j < N && (tileIndex * TILE_SIZE_RATIO + i) < K) {
-      sharedB[i * TILE_SIZE_B + j] = B[(tileIndex * TILE_SIZE_RATIO + i) * N + globalCol + j];
+    if (col + j < N && (tileIndex * TILE_SIZE_RATIO + i) < K) {
+      sharedB[i * TILE_SIZE_B + j] = B[(tileIndex * TILE_SIZE_RATIO + i) * N + col + j];
     } else {
       sharedB[i * TILE_SIZE_B + j] = 0.0;
     }
@@ -51,8 +51,8 @@ void main() {
     for (uint i = 0; i < TILE_SIZE_RATIO; i++) {
       // Load tile of matrix A into register
       float aReg = 0.0;
-      if (globalRow < M && (tileIndex * TILE_SIZE_RATIO + i) < K) {
-        aReg = A[globalRow * K + (tileIndex * TILE_SIZE_RATIO + i)];
+      if (row < M && (tileIndex * TILE_SIZE_RATIO + i) < K) {
+        aReg = A[row * K + (tileIndex * TILE_SIZE_RATIO + i)];
       }
       // Loop over and update the output elements
       for (uint j = 0; j < TILE_SIZE_B; j++) {
@@ -65,8 +65,8 @@ void main() {
 
   // Store the output array variable to P elements
   for (uint j = 0; j < TILE_SIZE_B; j++) {
-    if (globalRow < M && globalCol + j < N) {
-      C[globalRow * N + globalCol + j] = cReg[j];
+    if (row < M && col + j < N) {
+      C[row * N + col + j] = cReg[j];
     }
   }
 }
