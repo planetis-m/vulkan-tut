@@ -12,36 +12,36 @@ else:
   {.error: "RenderDoc integration not implemented on this platform".}
 
 var
-  initialized* = false
-  rdoc_api*: ptr RENDERDOC_API_1_6_0 = nil
-  rdoc_getAPI: pRENDERDOC_GetAPI
+  initialized = false
+  rDocAPI: ptr RENDERDOC_API_1_6_0 = nil
+  rDocGetAPI: pRENDERDOC_GetAPI
 
-proc getRdocApi*(): ptr RENDERDOC_API_1_6_0 =
+proc getRdocAPI*(): ptr RENDERDOC_API_1_6_0 =
   if initialized:
-    return rdoc_api
+    return rDocAPI
   initialized = true
   let rDocHandleDLL = loadLib(rDocDLL)
   if isNil(rDocHandleDLL):
     raise newException(LibraryError, "Failed to load " & rDocDLL)
-  rdoc_getAPI = cast[pRENDERDOC_GetAPI](checkedSymAddr(rDocHandleDLL, "RENDERDOC_GetAPI"))
-  if rdoc_getAPI.isNil:
+  rDocGetAPI = cast[pRENDERDOC_GetAPI](checkedSymAddr(rDocHandleDLL, "RENDERDOC_GetAPI"))
+  if rDocGetAPI.isNil:
     raise newException(LibraryError, "Failed to find RENDERDOC_GetAPI")
-  let ret = rdoc_getAPI(eRENDERDOC_API_Version_1_6_0, cast[ptr pointer](addr rdoc_api))
+  let ret = rDocGetAPI(eRENDERDOC_API_Version_1_6_0, cast[ptr pointer](addr rDocAPI))
   if ret != 1:
-    rdoc_api = nil
+    rDocAPI = nil
     raise newException(LibraryError, "RenderDoc initialization failed")
-  result = rdoc_api
+  result = rDocAPI
 
-proc startRenderDocCapture*(instance: VkInstance) =
-  let rdoc_api = getRdocApi()
-  if rdoc_api.isNil:
+proc startFrameCapture*(instance: VkInstance) =
+  let rDocAPI = getRdocApi()
+  if rDocAPI.isNil:
     return
   let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
-  rdoc_api.StartFrameCapture(device, nil)
+  rDocAPI.StartFrameCapture(device, nil)
 
-proc endRenderDocCapture*(instance: VkInstance) =
-  let rdoc_api = getRdocApi()
-  if rdoc_api.isNil:
+proc endFrameCapture*(instance: VkInstance) =
+  let rDocAPI = getRdocApi()
+  if rDocAPI.isNil:
     return
   let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
-  discard rdoc_api.EndFrameCapture(device, nil)
+  discard rDocAPI.EndFrameCapture(device, nil)
