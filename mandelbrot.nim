@@ -71,8 +71,6 @@ proc getExtensions(): seq[cstring] =
   result = @[]
   when defined(vkDebug):
     result.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
-  result.add(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME)
-  result.add(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME)
 
 template toCStringArray(x: seq[cstring]): untyped =
   if x.len == 0: nil else: cast[cstringArray](addr x[0])
@@ -92,18 +90,10 @@ proc createInstance(x: var MandelbrotGenerator) =
     let foundValidationLayer = layerProperties.anyIt(
         "VK_LAYER_KHRONOS_validation" == cast[cstring](it.layerName.addr))
     assert foundValidationLayer, "Validation layer required, but not available"
-  let enables = [VkValidationFeatureEnableEXT.DebugPrintf]
-  let features = newVkValidationFeaturesEXT(
-    pEnabledValidationFeatures = addr enables[0],
-    enabledValidationFeatureCount = uint32(enables.len),
-    pDisabledValidationFeatures = nil,
-    disabledValidationFeatureCount = 0
-  )
   # Create a Vulkan instance
   let layers = getLayers()
   let extensions = getExtensions()
   let instanceCreateInfo = newVkInstanceCreateInfo(
-    pNext = addr features,
     pApplicationInfo = applicationInfo.addr,
     enabledLayerCount = uint32(layers.len),
     ppEnabledLayerNames = layers.toCStringArray,

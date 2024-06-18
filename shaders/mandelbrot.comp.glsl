@@ -1,5 +1,4 @@
 #version 450
-#extension GL_EXT_debug_printf : enable
 
 // We set local workgroup size via Specialization Constants.
 layout (local_size_x_id = 0, local_size_y_id = 1) in;
@@ -33,7 +32,6 @@ void main() {
   // launched. We terminate those invocations here.
   if (gl_GlobalInvocationID.x >= ubo.width ||
       gl_GlobalInvocationID.y >= ubo.height) { return; }
-  debugPrintfEXT("Test");
 
   float x = float(gl_GlobalInvocationID.x) / float(ubo.width);
   float y = float(gl_GlobalInvocationID.y) / float(ubo.height);
