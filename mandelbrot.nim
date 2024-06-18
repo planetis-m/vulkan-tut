@@ -102,7 +102,7 @@ proc createInstance(x: var MandelbrotGenerator) =
   let layers = getLayers()
   let extensions = getExtensions()
   let instanceCreateInfo = newVkInstanceCreateInfo(
-    pNext =  when defined(vkDebug): addr features else: nil,
+    pNext = when defined(vkDebug): addr features else: nil,
     pApplicationInfo = applicationInfo.addr,
     enabledLayerCount = uint32(layers.len),
     ppEnabledLayerNames = layers.toCStringArray,
@@ -356,7 +356,7 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   x.commandBuffer = allocateCommandBuffers(x.device, commandBufferAllocateInfo)
   # Begin recording the command buffer
   let commandBufferBeginInfo = newVkCommandBufferBeginInfo(
-    flags = VkCommandBufferUsageFlags(VkCommandBufferUsageFlagBits.OneTimeSubmitBit),
+    flags = VkCommandBufferUsageFlags(OneTimeSubmitBit),
     pInheritanceInfo = nil
   )
   beginCommandBuffer(x.commandBuffer, commandBufferBeginInfo)
