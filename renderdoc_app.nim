@@ -1,26 +1,26 @@
-## ****************************************************************************
-## The MIT License (MIT)
-##
-## Copyright (c) 2019-2024 Baldur Karlsson
-##
-## Permission is hereby granted, free of charge, to any person obtaining a copy
-## of this software and associated documentation files (the "Software"), to deal
-## in the Software without restriction, including without limitation the rights
-## to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-## copies of the Software, and to permit persons to whom the Software is
-## furnished to do so, subject to the following conditions:
-##
-## The above copyright notice and this permission notice shall be included in
-## all copies or substantial portions of the Software.
-##
-## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-## IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-## FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-## AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-## LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-## THE SOFTWARE.
-## ****************************************************************************
+# ****************************************************************************
+# The MIT License (MIT)
+#
+# Copyright (c) 2019-2024 Baldur Karlsson
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+# ****************************************************************************
 
 ##
 ## Documentation for the API is available at https://renderdoc.org/docs/in_application_api.html
@@ -506,18 +506,18 @@ type
 
 type
   RENDERDOC_Version* {.size: sizeof(cint).} = enum
-    eRENDERDOC_API_Version_1_0_0 = 10000, ## RENDERDOC_API_1_0_0 = 1 00 00
-    eRENDERDOC_API_Version_1_0_1 = 10001, ## RENDERDOC_API_1_0_1 = 1 00 01
-    eRENDERDOC_API_Version_1_0_2 = 10002, ## RENDERDOC_API_1_0_2 = 1 00 02
-    eRENDERDOC_API_Version_1_1_0 = 10100, ## RENDERDOC_API_1_1_0 = 1 01 00
-    eRENDERDOC_API_Version_1_1_1 = 10101, ## RENDERDOC_API_1_1_1 = 1 01 01
-    eRENDERDOC_API_Version_1_1_2 = 10102, ## RENDERDOC_API_1_1_2 = 1 01 02
-    eRENDERDOC_API_Version_1_2_0 = 10200, ## RENDERDOC_API_1_2_0 = 1 02 00
-    eRENDERDOC_API_Version_1_3_0 = 10300, ## RENDERDOC_API_1_3_0 = 1 03 00
-    eRENDERDOC_API_Version_1_4_0 = 10400, ## RENDERDOC_API_1_4_0 = 1 04 00
-    eRENDERDOC_API_Version_1_4_1 = 10401, ## RENDERDOC_API_1_4_1 = 1 04 01
-    eRENDERDOC_API_Version_1_4_2 = 10402, ## RENDERDOC_API_1_4_2 = 1 04 02
-    eRENDERDOC_API_Version_1_5_0 = 10500, ## RENDERDOC_API_1_5_0 = 1 05 00
+    eRENDERDOC_API_Version_1_0_0 = 10000 ## RENDERDOC_API_1_0_0 = 1 00 00
+    eRENDERDOC_API_Version_1_0_1 = 10001 ## RENDERDOC_API_1_0_1 = 1 00 01
+    eRENDERDOC_API_Version_1_0_2 = 10002 ## RENDERDOC_API_1_0_2 = 1 00 02
+    eRENDERDOC_API_Version_1_1_0 = 10100 ## RENDERDOC_API_1_1_0 = 1 01 00
+    eRENDERDOC_API_Version_1_1_1 = 10101 ## RENDERDOC_API_1_1_1 = 1 01 01
+    eRENDERDOC_API_Version_1_1_2 = 10102 ## RENDERDOC_API_1_1_2 = 1 01 02
+    eRENDERDOC_API_Version_1_2_0 = 10200 ## RENDERDOC_API_1_2_0 = 1 02 00
+    eRENDERDOC_API_Version_1_3_0 = 10300 ## RENDERDOC_API_1_3_0 = 1 03 00
+    eRENDERDOC_API_Version_1_4_0 = 10400 ## RENDERDOC_API_1_4_0 = 1 04 00
+    eRENDERDOC_API_Version_1_4_1 = 10401 ## RENDERDOC_API_1_4_1 = 1 04 01
+    eRENDERDOC_API_Version_1_4_2 = 10402 ## RENDERDOC_API_1_4_2 = 1 04 02
+    eRENDERDOC_API_Version_1_5_0 = 10500 ## RENDERDOC_API_1_5_0 = 1 05 00
     eRENDERDOC_API_Version_1_6_0 = 10600 ## RENDERDOC_API_1_6_0 = 1 06 00
 
 
@@ -551,28 +551,6 @@ type
 ##         capture made with StartFrameCapture() or EndFrameCapture()
 
 type
-  INNER_C_UNION_renderdoc_app_8* {.bycopy, union.} = object
-    Shutdown*: pRENDERDOC_Shutdown
-    RemoveHooks*: pRENDERDOC_RemoveHooks
-
-  INNER_C_UNION_renderdoc_app_10* {.bycopy, union.} = object
-    ## deprecated name
-    SetLogFilePathTemplate*: pRENDERDOC_SetLogFilePathTemplate
-    ## current name
-    SetCaptureFilePathTemplate*: pRENDERDOC_SetCaptureFilePathTemplate
-
-  INNER_C_UNION_renderdoc_app_12* {.bycopy, union.} = object
-    ## deprecated name
-    GetLogFilePathTemplate*: pRENDERDOC_GetLogFilePathTemplate
-    ## current name
-    GetCaptureFilePathTemplate*: pRENDERDOC_GetCaptureFilePathTemplate
-
-  INNER_C_UNION_renderdoc_app_14* {.bycopy, union.} = object
-    ## deprecated name
-    IsRemoteAccessConnected*: pRENDERDOC_IsRemoteAccessConnected
-    ## current name
-    IsTargetControlConnected*: pRENDERDOC_IsTargetControlConnected
-
   RENDERDOC_API_1_6_0* {.bycopy.} = object
     GetAPIVersion*: pRENDERDOC_GetAPIVersion
     SetCaptureOptionU32*: pRENDERDOC_SetCaptureOptionU32
@@ -583,48 +561,24 @@ type
     SetCaptureKeys*: pRENDERDOC_SetCaptureKeys
     GetOverlayBits*: pRENDERDOC_GetOverlayBits
     MaskOverlayBits*: pRENDERDOC_MaskOverlayBits
-    ## Shutdown was renamed to RemoveHooks in 1.4.1.
-    ## These unions allow old code to continue compiling without changes
-    ano_renderdoc_app_9*: INNER_C_UNION_renderdoc_app_8
+    RemoveHooks*: pRENDERDOC_RemoveHooks
     UnloadCrashHandler*: pRENDERDOC_UnloadCrashHandler
-    ## Get/SetLogFilePathTemplate was renamed to Get/SetCaptureFilePathTemplate in 1.1.2.
-    ## These unions allow old code to continue compiling without changes
-    ano_renderdoc_app_11*: INNER_C_UNION_renderdoc_app_10
-    ano_renderdoc_app_13*: INNER_C_UNION_renderdoc_app_12
+    SetCaptureFilePathTemplate*: pRENDERDOC_SetCaptureFilePathTemplate
+    GetCaptureFilePathTemplate*: pRENDERDOC_GetCaptureFilePathTemplate
     GetNumCaptures*: pRENDERDOC_GetNumCaptures
     GetCapture*: pRENDERDOC_GetCapture
     TriggerCapture*: pRENDERDOC_TriggerCapture
-    ## IsRemoteAccessConnected was renamed to IsTargetControlConnected in 1.1.1.
-    ## This union allows old code to continue compiling without changes
-    ano_renderdoc_app_15*: INNER_C_UNION_renderdoc_app_14
+    IsTargetControlConnected*: pRENDERDOC_IsTargetControlConnected
     LaunchReplayUI*: pRENDERDOC_LaunchReplayUI
     SetActiveWindow*: pRENDERDOC_SetActiveWindow
     StartFrameCapture*: pRENDERDOC_StartFrameCapture
     IsFrameCapturing*: pRENDERDOC_IsFrameCapturing
     EndFrameCapture*: pRENDERDOC_EndFrameCapture
-    ## new function in 1.1.0
     TriggerMultiFrameCapture*: pRENDERDOC_TriggerMultiFrameCapture
-    ## new function in 1.2.0
     SetCaptureFileComments*: pRENDERDOC_SetCaptureFileComments
-    ## new function in 1.4.0
     DiscardFrameCapture*: pRENDERDOC_DiscardFrameCapture
-    ## new function in 1.5.0
     ShowReplayUI*: pRENDERDOC_ShowReplayUI
-    ## new function in 1.6.0
     SetCaptureTitle*: pRENDERDOC_SetCaptureTitle
-
-  RENDERDOC_API_1_0_0* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_0_1* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_0_2* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_1_0* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_1_1* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_1_2* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_2_0* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_3_0* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_4_0* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_4_1* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_4_2* = RENDERDOC_API_1_6_0
-  RENDERDOC_API_1_5_0* = RENDERDOC_API_1_6_0
 
 ## RenderDoc API entry point
 ##
