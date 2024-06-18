@@ -357,8 +357,8 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   cmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipelineLayout,
       0, x.descriptorSets, [])
   # Dispatch the compute work
-  let numWorkgroupX = ceil(x.width.float32/x.workgroupSize.x.float32).uint32
-  let numWorkgroupY = ceil(x.height.float32/x.workgroupSize.y.float32).uint32
+  let numWorkgroupX = ceilDiv(x.width.uint32, x.workgroupSize.x)
+  let numWorkgroupY = ceilDiv(x.height.uint32, x.workgroupSize.y)
   vkCmdDispatch(x.commandBuffer, numWorkgroupX, numWorkgroupY, 1)
   # End recording the command buffer
   endCommandBuffer(x.commandBuffer)
