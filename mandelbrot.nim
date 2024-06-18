@@ -418,6 +418,8 @@ proc generate*(x: var MandelbrotGenerator): seq[ColorRGBA] =
     when defined(vkDebug):
       loadVkExtDebugUtils()
       setupDebugUtilsMessenger(x)
+    when defined(useRenderDoc):
+      rDocInit()
     findPhysicalDevice(x)
     createDevice(x)
     # Resource Setup Stage

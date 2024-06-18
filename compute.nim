@@ -63,6 +63,8 @@ proc main =
 
   vkInit(instance, load1_2 = false, load1_3 = false)
 
+  when defined(useRenderDoc): rDocInit()
+
   # Enumerate physical devices
   var physicalDeviceCount: uint32 = 0
   discard vkEnumeratePhysicalDevices(instance, physicalDeviceCount.addr, nil)

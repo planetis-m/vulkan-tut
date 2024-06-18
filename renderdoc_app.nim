@@ -258,11 +258,6 @@ type
 type
   pRENDERDOC_RemoveHooks* = proc () {.cdecl.}
 
-## DEPRECATED: compatibility for code compiled against pre-1.4.1 headers.
-
-type
-  pRENDERDOC_Shutdown* = pRENDERDOC_RemoveHooks
-
 ## This function will unload RenderDoc's crash handler.
 ##
 ## If you use your own crash handler and don't want RenderDoc's handler to
@@ -297,12 +292,6 @@ type
 
 type
   pRENDERDOC_GetCaptureFilePathTemplate* = proc (): cstring {.cdecl.}
-
-## DEPRECATED: compatibility for code compiled against pre-1.1.2 headers.
-
-type
-  pRENDERDOC_SetLogFilePathTemplate* = pRENDERDOC_SetCaptureFilePathTemplate
-  pRENDERDOC_GetLogFilePathTemplate* = pRENDERDOC_GetCaptureFilePathTemplate
 
 ## returns the number of captures that have been made
 
@@ -346,14 +335,6 @@ type
 
 type
   pRENDERDOC_IsTargetControlConnected* = proc (): uint32 {.cdecl.}
-
-## DEPRECATED: compatibility for code compiled against pre-1.1.1 headers.
-## This was renamed to IsTargetControlConnected in API 1.1.1, the old typedef is kept here for
-## backwards compatibility with old code, it is castable either way since it's ABI compatible
-## as the same function pointer type.
-
-type
-  pRENDERDOC_IsRemoteAccessConnected* = pRENDERDOC_IsTargetControlConnected
 
 ## This function will launch the Replay UI associated with the RenderDoc library injected
 ## into the running application.
