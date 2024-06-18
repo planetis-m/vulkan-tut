@@ -24,8 +24,6 @@ proc getRdocAPI(): ptr RENDERDOC_API_1_6_0 =
   if isNil(rDocHandleDLL):
     raise newException(LibraryError, "Failed to load " & rDocDLL)
   rDocGetAPI = cast[pRENDERDOC_GetAPI](checkedSymAddr(rDocHandleDLL, "RENDERDOC_GetAPI"))
-  if rDocGetAPI.isNil:
-    raise newException(LibraryError, "Failed to find RENDERDOC_GetAPI")
   let ret = rDocGetAPI(eRENDERDOC_API_Version_1_6_0, cast[ptr pointer](addr rDocAPI))
   if ret != 1:
     rDocAPI = nil
@@ -33,13 +31,13 @@ proc getRdocAPI(): ptr RENDERDOC_API_1_6_0 =
   result = rDocAPI
 
 proc startFrameCapture*(instance: VkInstance) =
-  let rDocAPI = getRdocApi()
+  let rDocAPI = getRdocAPI()
   if not rDocAPI.isNil:
     let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
     rDocAPI.StartFrameCapture(device, nil)
 
 proc endFrameCapture*(instance: VkInstance) =
-  let rDocAPI = getRdocApi()
+  let rDocAPI = getRdocAPI()
   if not rDocAPI.isNil:
     let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
     discard rDocAPI.EndFrameCapture(device, nil)
