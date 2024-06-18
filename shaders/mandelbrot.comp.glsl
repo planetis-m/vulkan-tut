@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_debug_printf : require
 
 // We set local workgroup size via Specialization Constants.
 layout (local_size_x_id = 0, local_size_y_id = 1) in;
@@ -52,6 +53,10 @@ void main() {
   // We use a cosine palette to determine the color of pixels.
   vec4 color = vec4(palette(float(n) / float(m)), 1.0f);
 
+  // Debug printf output
+  if (gl_GlobalInvocationID == uvec3(0)) {
+    debugPrintfEXT("Invocation ID: %u", 0);
+  }
   // Store the color data into the storage buffer.
   image[ubo.width * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = color;
 }

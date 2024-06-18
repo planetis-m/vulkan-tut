@@ -1,5 +1,5 @@
 # https://youtu.be/1BMGTyIF5dI
-import vulkan, vulkan_wrapper, std/[sequtils, math], chroma, renderdoc
+import vulkan, vulkan_wrapper, std/[sequtils, math, strutils], chroma, renderdoc
 
 type
   MandelbrotGenerator* = object
@@ -82,7 +82,7 @@ proc createInstance(x: var MandelbrotGenerator) =
     applicationVersion = vkMakeVersion(0, 1, 0, 0),
     pEngineName = "No Engine",
     engineVersion = vkMakeVersion(0, 1, 0, 0),
-    apiVersion = vkApiVersion1_1
+    apiVersion = vkApiVersion1_3
   )
   when defined(vkDebug):
     # Enable the Khronos validation layer
@@ -90,10 +90,19 @@ proc createInstance(x: var MandelbrotGenerator) =
     let foundValidationLayer = layerProperties.anyIt(
         "VK_LAYER_KHRONOS_validation" == cast[cstring](it.layerName.addr))
     assert foundValidationLayer, "Validation layer required, but not available"
+    # Shader printf is a feature of the validation layers that needs to be enabled
+    let enables = [VkValidationFeatureEnableEXT.DebugPrintf]
+    let features = newVkValidationFeaturesEXT(
+      pEnabledValidationFeatures = addr enables[0],
+      enabledValidationFeatureCount = uint32(enables.len),
+      pDisabledValidationFeatures = nil,
+      disabledValidationFeatureCount = 0
+    )
   # Create a Vulkan instance
   let layers = getLayers()
   let extensions = getExtensions()
   let instanceCreateInfo = newVkInstanceCreateInfo(
+    pNext =  when defined(vkDebug): addr features else: nil,
     pApplicationInfo = applicationInfo.addr,
     enabledLayerCount = uint32(layers.len),
     ppEnabledLayerNames = layers.toCStringArray,
@@ -391,8 +400,14 @@ when defined(vkDebug):
                      messageTypes: VkDebugUtilsMessageTypeFlagsEXT,
                      pCallbackData: ptr VkDebugUtilsMessengerCallbackDataEXT,
                      pUserData: pointer): VkBool32 {.cdecl.} =
-    stderr.write(pCallbackData.pMessage)
-    stderr.write("\n")
+    var message = $pCallbackData.pMessage
+    if "WARNING-DEBUG-PRINTF" == pCallbackData.pMessageIdName:
+      # Validation messages are a bit verbose.
+      let delimiter = "| vkQueueSubmit():  "
+      if (let pos = message.find(delimiter); pos >= 0):
+        # Extract the part of the message after the delimiter
+        message = message.substr(pos + len(delimiter))
+    stderr.writeLine(message)
     return VkBool32(false)
 
   proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
