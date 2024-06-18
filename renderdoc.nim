@@ -50,6 +50,9 @@ proc discardFrameCapture*(device: RENDERDOC_DevicePointer, wndHandle: RENDERDOC_
 proc isFrameCapturing*(): bool =
   rDocAPI.IsFrameCapturing() == 1
 
+proc triggerCapture*() =
+  rDocAPI.TriggerCapture()
+
 proc triggerMultiFrameCapture*(numFrames: uint32) =
   rDocAPI.TriggerMultiFrameCapture(numFrames)
 
@@ -59,7 +62,7 @@ proc setActiveWindow*(device: RENDERDOC_DevicePointer, wndHandle: RENDERDOC_Wind
 proc showReplayUI*(): bool =
   rDocAPI.ShowReplayUI() == 1
 
-proc setCaptureFileComments*(filePath, comments: string) =
+proc setCaptureFileComments(filePath, comments: string) =
   rDocAPI.SetCaptureFileComments(filePath.cstring, comments.cstring)
 
 proc getCapture*(idx: uint32, filename: string, pathlength: out uint32, timestamp: out uint64): bool =
