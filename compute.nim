@@ -1,4 +1,4 @@
-import vulkan, std/[strutils, times]
+import vulkan, std/[strutils, times], renderdoc
 
 template toCString(arr: openarray[char]): untyped = cast[cstring](addr arr[0])
 template toCStringArray(arr: openarray[cstring]): untyped = cast[cstringArray](addr arr[0])
@@ -164,7 +164,7 @@ proc main =
   # Bind the memory to the output buffer at the aligned offset
   doAssert vkBindBufferMemory(device, outBuffer, bufferMemory, alignedSize) == VkSuccess
 
-  let shaderCode = readFile("build/shaders/square.spv")
+  let shaderCode = readFile("build/shaders/square.comp.spv")
   # Create a VkShaderModuleCreateInfo struct
   let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
     codeSize = shaderCode.len.uint,
@@ -358,8 +358,11 @@ proc main =
   var fence: VkFence
   doAssert vkCreateFence(device, fenceCreateInfo.addr, nil, fence.addr) == VkSuccess
   let t0 = cpuTime()
+
+  when defined(useRenderDoc): startFrameCapture(instance)
   # Submit the command buffer
   doAssert vkQueueSubmit(computeQueue, 1, submitInfo.addr, fence) == VkSuccess
+  when defined(useRenderDoc): endFrameCapture(instance)
 
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
   doAssert vkWaitForFences(device, 1, fence.addr, true.VkBool32, high(uint64)) == VkSuccess

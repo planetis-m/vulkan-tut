@@ -16,7 +16,7 @@ var
   rDocAPI: ptr RENDERDOC_API_1_6_0 = nil
   rDocGetAPI: pRENDERDOC_GetAPI
 
-proc getRdocAPI*(): ptr RENDERDOC_API_1_6_0 =
+proc getRdocAPI(): ptr RENDERDOC_API_1_6_0 =
   if initialized:
     return rDocAPI
   initialized = true
@@ -34,14 +34,12 @@ proc getRdocAPI*(): ptr RENDERDOC_API_1_6_0 =
 
 proc startFrameCapture*(instance: VkInstance) =
   let rDocAPI = getRdocApi()
-  if rDocAPI.isNil:
-    return
-  let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
-  rDocAPI.StartFrameCapture(device, nil)
+  if not rDocAPI.isNil:
+    let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
+    rDocAPI.StartFrameCapture(device, nil)
 
 proc endFrameCapture*(instance: VkInstance) =
   let rDocAPI = getRdocApi()
-  if rDocAPI.isNil:
-    return
-  let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
-  discard rDocAPI.EndFrameCapture(device, nil)
+  if not rDocAPI.isNil:
+    let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
+    discard rDocAPI.EndFrameCapture(device, nil)

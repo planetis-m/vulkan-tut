@@ -1,5 +1,5 @@
 # https://youtu.be/1BMGTyIF5dI
-import vulkan, vulkan_wrapper, std/[sequtils, math], chroma
+import vulkan, vulkan_wrapper, std/[sequtils, math], chroma, renderdoc
 
 type
   MandelbrotGenerator* = object
@@ -378,8 +378,10 @@ proc submitCommandBuffer(x: MandelbrotGenerator) =
   # Create a fence
   let fenceCreateInfo = newVkFenceCreateInfo()
   let fence = createFence(x.device, fenceCreateInfo)
+  when defined(useRenderDoc): startFrameCapture(x.instance)
   # Submit the command buffer
   queueSubmit(x.queue, submitInfos, fence)
+  when defined(useRenderDoc): endFrameCapture(x.instance)
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
   waitForFence(x.device, fence, VkBool32(true), high(uint64))
   vkDestroyFence(x.device, fence, nil)
