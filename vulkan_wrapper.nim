@@ -139,6 +139,17 @@ proc endCommandBuffer*(commandBuffer: VkCommandBuffer) =
 proc deviceWaitIdle*(device: VkDevice) =
   checkVkResult vkDeviceWaitIdle(device)
 
+proc unmapMemory*(device: VkDevice, memory: VkDeviceMemory) =
+  vkUnmapMemory(device, memory)
+
+proc cmdDispatch*(commandBuffer: VkCommandBuffer, groupCountX: uint32, groupCountY: uint32,
+                  groupCountZ: uint32) =
+  vkCmdDispatch(commandBuffer, groupCountX, groupCountY, groupCountZ)
+
+proc cmdBindPipeline*(commandBuffer: VkCommandBuffer, pipelineBindPoint: VkPipelineBindPoint,
+                      pipeline: VkPipeline) =
+  vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline)
+
 proc freeMemory*(device: VkDevice, memory: VkDeviceMemory, allocator: ptr VkAllocationCallbacks = nil) =
   if memory != 0.VkDeviceMemory:
     vkFreeMemory(device, memory, allocator)

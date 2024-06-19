@@ -60,7 +60,7 @@ proc fetchRenderedImage(x: MandelbrotGenerator): seq[ColorRGBA] =
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).
   for i in 0..result.high:
     result[i] = rgba(data[i])
-  vkUnmapMemory(x.device, x.storageBufferMemory)
+  unmapMemory(x.device, x.storageBufferMemory)
 
 proc getLayers(): seq[cstring] =
   result = @[]
@@ -188,7 +188,7 @@ proc createBuffers(x: var MandelbrotGenerator) =
       VkDeviceSize(sizeof(int32)*2), 0.VkMemoryMapFlags)
   let ubo = [x.width.int32, x.height.int32]
   copyMem(mappedMemory, ubo.addr, sizeof(int32)*2)
-  vkUnmapMemory(x.device, x.uniformBufferMemory)
+  unmapMemory(x.device, x.uniformBufferMemory)
 
 proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
   # Define the descriptor set layout bindings
@@ -340,14 +340,14 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   )
   beginCommandBuffer(x.commandBuffer, commandBufferBeginInfo)
   # Bind the compute pipeline
-  vkCmdBindPipeline(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipeline)
+  cmdBindPipeline(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipeline)
   # Bind the descriptor set
   cmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipelineLayout,
       0, x.descriptorSets, [])
   # Dispatch the compute work
   let numWorkgroupX = ceilDiv(x.width.uint32, x.workgroupSize.x)
   let numWorkgroupY = ceilDiv(x.height.uint32, x.workgroupSize.y)
-  vkCmdDispatch(x.commandBuffer, numWorkgroupX, numWorkgroupY, 1)
+  cmdDispatch(x.commandBuffer, numWorkgroupX, numWorkgroupY, 1)
   # End recording the command buffer
   endCommandBuffer(x.commandBuffer)
 

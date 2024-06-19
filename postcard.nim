@@ -19,7 +19,7 @@ when defined(vkDebug):
       messageType = messageTypeFlags,
       pfnUserCallback = debugCallback
     )
-    result = createDebugUtilsMessengerEXT(instance, createInfo)
+    createDebugUtilsMessengerEXT(instance, createInfo)
 
 proc getLayers(): seq[cstring] =
   result = @[]
@@ -36,7 +36,7 @@ proc main() =
   let applicationInfo = newVkApplicationInfo(
     pApplicationName = "Hello World",
     applicationVersion = 0,
-    pEngineName = cstring(nil),
+    pEngineName = nil,
     engineVersion = 0,
     apiVersion = vkApiVersion1_3
   )
@@ -47,9 +47,8 @@ proc main() =
         "VK_LAYER_KHRONOS_validation" == cast[cstring](it.layerName.addr))
     assert foundValidationLayer, "Validation layer required, but not available"
     # Shader printf is a feature of the validation layers that needs to be enabled
-    let enables = [VkValidationFeatureEnableEXT.DebugPrintf]
     let features = newVkValidationFeaturesEXT(
-      enabledValidationFeatures = enables,
+      enabledValidationFeatures = [VkValidationFeatureEnableEXT.DebugPrintf],
       disabledValidationFeatures = []
     )
   let layers = getLayers()
@@ -134,8 +133,8 @@ proc main() =
     pInheritanceInfo = nil
   )
   beginCommandBuffer(commandBuffer, beginInfo)
-  vkCmdBindPipeline(commandBuffer, VkPipelineBindPoint.Compute, pipeline)
-  vkCmdDispatch(commandBuffer, 8, 1, 1)
+  cmdBindPipeline(commandBuffer, VkPipelineBindPoint.Compute, pipeline)
+  cmdDispatch(commandBuffer, 8, 1, 1)
   endCommandBuffer(commandBuffer)
 
   var queue = getDeviceQueue(device, family, 0)
