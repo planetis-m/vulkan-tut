@@ -117,7 +117,7 @@ proc getComputeQueueFamilyIndex(physicalDevice: VkPhysicalDevice): uint32 =
   for i in 0 ..< queueFamilyProperties.len:
     let property = queueFamilyProperties[i]
     if property.queueCount > 0 and
-        (property.queueFlags.uint32 and VkQueueFlagBits.ComputeBit.uint32) != 0:
+        VkQueueFlagBits.ComputeBit in property.queueFlags:
       return i.uint32
   assert false, "Could not find a queue family that supports operations"
 
@@ -147,7 +147,7 @@ proc findMemoryType(physicalDevice: VkPhysicalDevice, typeFilter: uint32,
   for i in 0 ..< memoryProperties.memoryTypeCount.int:
     let memoryType = memoryProperties.memoryTypes[i]
     if (typeFilter and (1'u32 shl i.uint32)) != 0 and
-        (memoryType.propertyFlags.uint32 and properties.uint32) == properties.uint32 and
+        memoryType.propertyFlags >= properties and
         size.uint64 <= memoryProperties.memoryHeaps[memoryType.heapIndex].size.uint64:
       return i.uint32
   assert false, "Failed to find suitable memory type"

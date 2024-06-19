@@ -65,7 +65,7 @@ proc main() =
   when defined(vkDebug):
     loadVkExtDebugUtils()
     let debugUtilsMessenger = setupDebugUtilsMessenger(instance)
-  # when defined(useRenderDoc): rDocInit()
+  when defined(useRenderDoc): rDocInit()
   let physicalDevices = enumeratePhysicalDevices(instance)
   assert physicalDevices.len > 0, "Cannot find any physical devices."
   let physicalDevice = physicalDevices[0]
@@ -73,7 +73,7 @@ proc main() =
   var family: uint32 = 0
   var queueFamilyProperties = getQueueFamilyProperties(physicalDevice)
   for i in 0..queueFamilyProperties.high:
-    if (queueFamilyProperties[i].queueFlags.uint32 and VkQueueFlagBits.ComputeBit.uint32) != 0:
+    if VkQueueFlagBits.ComputeBit in queueFamilyProperties[i].queueFlags:
       family = i.uint32
       break
 
@@ -145,9 +145,9 @@ proc main() =
     commandBuffers = [commandBuffer],
     signalSemaphores = []
   )
-  # when defined(useRenderDoc): startFrameCapture(instance)
+  when defined(useRenderDoc): startFrameCapture(instance)
   queueSubmit(queue, [submitInfo], 0.VkFence)
-  # when defined(useRenderDoc): endFrameCapture(instance)
+  when defined(useRenderDoc): endFrameCapture(instance)
   doAssert vkDeviceWaitIdle(device) == VkSuccess
 
   # Cleanup resources
