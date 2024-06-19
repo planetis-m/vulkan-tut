@@ -31,9 +31,6 @@ proc getExtensions(): seq[cstring] =
   when defined(vkDebug):
     result.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
 
-template toCStringArray(x: seq[cstring]): untyped =
-  if x.len == 0: nil else: cast[cstringArray](addr x[0])
-
 proc main() =
   vkPreload()
   let applicationInfo = newVkApplicationInfo(
@@ -52,20 +49,16 @@ proc main() =
     # Shader printf is a feature of the validation layers that needs to be enabled
     let enables = [VkValidationFeatureEnableEXT.DebugPrintf]
     let features = newVkValidationFeaturesEXT(
-      pEnabledValidationFeatures = addr enables[0],
-      enabledValidationFeatureCount = uint32(enables.len),
-      pDisabledValidationFeatures = nil,
-      disabledValidationFeatureCount = 0
+      enabledValidationFeatures = enables,
+      disabledValidationFeatures = []
     )
   let layers = getLayers()
   let extensions = getExtensions()
   let instanceInfo = newVkInstanceCreateInfo(
     pNext = when defined(vkDebug): addr features else: nil,
     pApplicationInfo = addr applicationInfo,
-    enabledLayerCount = layers.len.uint32,
-    ppEnabledLayerNames = layers.toCStringArray,
-    enabledExtensionCount = extensions.len.uint32,
-    ppEnabledExtensionNames = extensions.toCStringArray
+    enabledLayerNames = layers,
+    enabledExtensionNames = extensions
   )
   let instance = createInstance(instanceInfo)
   vkInit(instance, load1_2 = false, load1_3 = false)
@@ -87,24 +80,18 @@ proc main() =
   let priority: array[1, float32] = [1.0]
   let deviceQueueCreateInfo = newVkDeviceQueueCreateInfo(
     queueFamilyIndex = family,
-    queueCount = 1,
-    pQueuePriorities = priority[0].addr
+    queuePriorities = priority
   )
   let deviceCreateInfo = newVkDeviceCreateInfo(
-    queueCreateInfoCount = 1,
-    pQueueCreateInfos = addr deviceQueueCreateInfo,
-    enabledLayerCount = 0,
-    ppEnabledLayerNames = nil,
-    enabledExtensionCount = 0,
-    ppEnabledExtensionNames = nil,
-    pEnabledFeatures = nil
+    queueCreateInfos = [deviceQueueCreateInfo],
+    enabledLayerNames = [],
+    enabledExtensionNames = [],
+    enabledFeatures = []
   )
   let device = createDevice(physicalDevice, deviceCreateInfo)
 
-  let spirv = readFile("build/shaders/hello_world.comp.spv")
   let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
-    codeSize = spirv.len.uint,
-    pCode = cast[ptr uint32](spirv[0].addr)
+    code = readFile("build/shaders/hello_world.comp.spv")
   )
   let shaderModule = createShaderModule(device, shaderModuleCreateInfo)
 
@@ -115,10 +102,8 @@ proc main() =
     pSpecializationInfo = nil
   )
   let pipelineLayoutCreateInfo = newVkPipelineLayoutCreateInfo(
-    setLayoutCount = 0,
-    pSetLayouts = nil,
-    pushConstantRangeCount = 0,
-    pPushConstantRanges = nil
+    setLayouts = [],
+    pushConstantRanges = []
   )
   let pipelineLayout = createPipelineLayout(device, pipelineLayoutCreateInfo)
 
@@ -155,18 +140,15 @@ proc main() =
 
   var queue = getDeviceQueue(device, family, 0)
   let submitInfo = newVkSubmitInfo(
-    waitSemaphoreCount = 0,
-    pWaitSemaphores = nil,
-    pWaitDstStageMask = nil,
-    commandBufferCount = 1,
-    pCommandBuffers = addr commandBuffer,
-    signalSemaphoreCount = 0,
-    pSignalSemaphores = nil
+    waitSemaphores = [],
+    waitDstStageMask = [],
+    commandBuffers = [commandBuffer],
+    signalSemaphores = []
   )
   # when defined(useRenderDoc): startFrameCapture(instance)
   queueSubmit(queue, [submitInfo], 0.VkFence)
   # when defined(useRenderDoc): endFrameCapture(instance)
-  discard vkDeviceWaitIdle(device)
+  doAssert vkDeviceWaitIdle(device) == VkSuccess
 
   # Cleanup resources
   vkDestroyCommandPool(device, commandPool, nil)

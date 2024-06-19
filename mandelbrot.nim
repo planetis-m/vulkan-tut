@@ -72,9 +72,6 @@ proc getExtensions(): seq[cstring] =
   when defined(vkDebug):
     result.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
 
-template toCStringArray(x: seq[cstring]): untyped =
-  if x.len == 0: nil else: cast[cstringArray](addr x[0])
-
 proc createInstance(x: var MandelbrotGenerator) =
   # Create an ApplicationInfo struct
   let applicationInfo = newVkApplicationInfo(
@@ -93,10 +90,8 @@ proc createInstance(x: var MandelbrotGenerator) =
     # Shader printf is a feature of the validation layers that needs to be enabled
     let enables = [VkValidationFeatureEnableEXT.DebugPrintf]
     let features = newVkValidationFeaturesEXT(
-      pEnabledValidationFeatures = addr enables[0],
-      enabledValidationFeatureCount = uint32(enables.len),
-      pDisabledValidationFeatures = nil,
-      disabledValidationFeatureCount = 0
+      enabledValidationFeatures = enables,
+      disabledValidationFeatures = []
     )
   # Create a Vulkan instance
   let layers = getLayers()
@@ -104,10 +99,8 @@ proc createInstance(x: var MandelbrotGenerator) =
   let instanceCreateInfo = newVkInstanceCreateInfo(
     pNext = when defined(vkDebug): addr features else: nil,
     pApplicationInfo = applicationInfo.addr,
-    enabledLayerCount = uint32(layers.len),
-    ppEnabledLayerNames = layers.toCStringArray,
-    enabledExtensionCount = uint32(extensions.len),
-    ppEnabledExtensionNames = extensions.toCStringArray
+    enabledLayerNames = layers,
+    enabledExtensionNames = extensions
   )
   x.instance = createInstance(instanceCreateInfo)
 
@@ -130,21 +123,17 @@ proc getComputeQueueFamilyIndex(physicalDevice: VkPhysicalDevice): uint32 =
 
 proc createDevice(x: var MandelbrotGenerator) =
   x.queueFamilyIndex = getComputeQueueFamilyIndex(x.physicalDevice)
-  let queuePriority = 1.0'f32
+  let queuePriority: array[1, float32] = [1.0]
   let queueCreateInfo = newVkDeviceQueueCreateInfo(
     queueFamilyIndex = x.queueFamilyIndex,
-    queueCount = 1,
-    pQueuePriorities = queuePriority.addr
+    queuePriorities = queuePriority
   )
   let layers = getLayers()
   let deviceCreateInfo = newVkDeviceCreateInfo(
-    queueCreateInfoCount = 1,
-    pQueueCreateInfos = queueCreateInfo.addr,
-    enabledLayerCount = uint32(layers.len),
-    ppEnabledLayerNames = layers.toCStringArray,
-    enabledExtensionCount = 0,
-    ppEnabledExtensionNames = nil,
-    pEnabledFeatures = nil
+    queueCreateInfos = [queueCreateInfo],
+    enabledLayerNames = layers,
+    enabledExtensionNames = [],
+    enabledFeatures = []
   )
   # Create a logical device
   x.device = createDevice(x.physicalDevice, deviceCreateInfo)
@@ -169,8 +158,7 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
     size = size,
     usage = usage,
     sharingMode = VkSharingMode.Exclusive,
-    queueFamilyIndexCount = 0,
-    pQueueFamilyIndices = nil
+    queueFamilyIndices = []
   )
   let buffer = createBuffer(x.device, bufferCreateInfo)
   # Memory requirements
@@ -223,8 +211,7 @@ proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
   ]
   # Create a descriptor set layout
   let createInfo = newVkDescriptorSetLayoutCreateInfo(
-    bindingCount = bindings.len.uint32,
-    pBindings = bindings[0].addr
+    bindings = bindings
   )
   x.descriptorSetLayout = createDescriptorSetLayout(x.device, createInfo)
 
@@ -242,15 +229,13 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
   ]
   let descriptorPoolCreateInfo = newVkDescriptorPoolCreateInfo(
     maxSets = 2,
-    poolSizeCount = descriptorPoolSizes.len.uint32,
-    pPoolSizes = descriptorPoolSizes[0].addr
+    poolSizes = descriptorPoolSizes
   )
   x.descriptorPool = createDescriptorPool(x.device, descriptorPoolCreateInfo)
   # Allocate a descriptor set
   let descriptorSetAllocateInfo = newVkDescriptorSetAllocateInfo(
     descriptorPool = x.descriptorPool,
-    descriptorSetCount = 1,
-    pSetLayouts = x.descriptorSetLayout.addr
+    setLayouts = [x.descriptorSetLayout]
   )
   let descriptorSet = allocateDescriptorSets(x.device, descriptorSetAllocateInfo)
   x.descriptorSets = @[descriptorSet]
@@ -291,10 +276,8 @@ proc createDescriptorSets(x: var MandelbrotGenerator) =
 
 proc createComputePipeline(x: var MandelbrotGenerator) =
   # Create the shader module
-  let computeShaderCode = readFile("build/shaders/mandelbrot.comp.spv")
   let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
-    codeSize = computeShaderCode.len.uint,
-    pCode = cast[ptr uint32](computeShaderCode[0].addr)
+    code = readFile("build/shaders/mandelbrot.comp.spv")
   )
   let computeShaderModule = createShaderModule(x.device, shaderModuleCreateInfo)
   let specializationMapEntries = [
@@ -310,8 +293,7 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
     )
   ]
   let specializationInfo = newVkSpecializationInfo(
-    mapEntryCount = specializationMapEntries.len.uint32,
-    pMapEntries = specializationMapEntries[0].addr,
+    mapEntries = specializationMapEntries,
     dataSize = sizeof(WorkgroupSize).uint,
     pData = x.workgroupSize.addr
   )
@@ -323,10 +305,8 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
   )
   # Create a pipeline layout with the descriptor set layout
   let pipelineLayoutCreateInfo = newVkPipelineLayoutCreateInfo(
-    setLayoutCount = 1,
-    pSetLayouts = x.descriptorSetLayout.addr,
-    pushConstantRangeCount = 0,
-    pPushConstantRanges = nil
+    setLayouts = [x.descriptorSetLayout],
+    pushConstantRanges = []
   )
   x.pipelineLayout = createPipelineLayout(x.device, pipelineLayoutCreateInfo)
   # Create the compute pipeline
@@ -375,13 +355,10 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
 proc submitCommandBuffer(x: MandelbrotGenerator) =
   let submitInfos = [
     newVkSubmitInfo(
-      waitSemaphoreCount = 0,
-      pWaitSemaphores = nil,
-      pWaitDstStageMask = nil,
-      commandBufferCount = 1,
-      pCommandBuffers = x.commandBuffer.addr,
-      signalSemaphoreCount = 0,
-      pSignalSemaphores = nil
+      waitSemaphores = [],
+      waitDstStageMask = [],
+      commandBuffers = [x.commandBuffer],
+      signalSemaphores = []
     )
   ]
   # Create a fence
