@@ -124,3 +124,47 @@ proc cmdBindDescriptorSets*(commandBuffer: VkCommandBuffer, pipelineBindPoint: V
 
 proc endCommandBuffer*(commandBuffer: VkCommandBuffer) =
   checkVkResult vkEndCommandBuffer(commandBuffer)
+
+proc freeMemory*(device: VkDevice, memory: VkDeviceMemory, allocator: ptr VkAllocationCallbacks = nil) =
+  if memory != 0.VkDeviceMemory:
+    vkFreeMemory(device, memory, allocator)
+
+proc destroyBuffer*(device: VkDevice, buffer: VkBuffer, allocator: ptr VkAllocationCallbacks = nil) =
+  if buffer != 0.VkBuffer:
+    vkDestroyBuffer(device, buffer, allocator)
+
+proc destroyPipeline*(device: VkDevice, pipeline: VkPipeline, allocator: ptr VkAllocationCallbacks = nil) =
+  if pipeline != 0.VkPipeline:
+    vkDestroyPipeline(device, pipeline, allocator)
+
+proc destroyPipelineLayout*(device: VkDevice, pipelineLayout: VkPipelineLayout, allocator: ptr VkAllocationCallbacks = nil) =
+  if pipelineLayout != 0.VkPipelineLayout:
+    vkDestroyPipelineLayout(device, pipelineLayout, allocator)
+
+proc freeDescriptorSets*(device: VkDevice, descriptorPool: VkDescriptorPool, descriptorSets: seq[VkDescriptorSet]) =
+  if descriptorSets.len > 0:
+    discard vkFreeDescriptorSets(device, descriptorPool, descriptorSets.len.uint32, descriptorSets[0].addr)
+
+proc destroyDescriptorPool*(device: VkDevice, descriptorPool: VkDescriptorPool, allocator: ptr VkAllocationCallbacks = nil) =
+  if descriptorPool != 0.VkDescriptorPool:
+    vkDestroyDescriptorPool(device, descriptorPool, allocator)
+
+proc destroyDescriptorSetLayout*(device: VkDevice, descriptorSetLayout: VkDescriptorSetLayout, allocator: ptr VkAllocationCallbacks = nil) =
+  if descriptorSetLayout != 0.VkDescriptorSetLayout:
+    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, allocator)
+
+proc destroyCommandPool*(device: VkDevice, commandPool: VkCommandPool, allocator: ptr VkAllocationCallbacks = nil) =
+  if commandPool != 0.VkCommandPool:
+    vkDestroyCommandPool(device, commandPool, allocator)
+
+proc destroyDevice*(device: VkDevice, allocator: ptr VkAllocationCallbacks = nil) =
+  if device != 0.VkDevice:
+    vkDestroyDevice(device, allocator)
+
+proc destroyDebugUtilsMessenger*(instance: VkInstance, debugUtilsMessenger: VkDebugUtilsMessengerEXT, allocator: ptr VkAllocationCallbacks = nil) =
+  if debugUtilsMessenger != 0.VkDebugUtilsMessengerEXT:
+    vkDestroyDebugUtilsMessengerEXT(instance, debugUtilsMessenger, allocator)
+
+proc destroyInstance*(instance: VkInstance, allocator: ptr VkAllocationCallbacks = nil) =
+  if instance != 0.VkInstance:
+    vkDestroyInstance(instance, allocator)

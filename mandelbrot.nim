@@ -29,19 +29,20 @@ type
 
 proc cleanup(x: MandelbrotGenerator) =
   # Clean up
-  vkFreeMemory(x.device, x.uniformBufferMemory, nil)
-  vkDestroyBuffer(x.device, x.uniformBuffer, nil)
-  vkFreeMemory(x.device, x.storageBufferMemory, nil)
-  vkDestroyBuffer(x.device, x.storageBuffer, nil)
-  vkDestroyPipeline(x.device, x.pipeline, nil)
-  vkDestroyPipelineLayout(x.device, x.pipelineLayout, nil)
-  vkDestroyDescriptorPool(x.device, x.descriptorPool, nil)
-  vkDestroyDescriptorSetLayout(x.device, x.descriptorSetLayout, nil)
-  vkDestroyCommandPool(x.device, x.commandPool, nil)
-  vkDestroyDevice(x.device, nil)
+  freeMemory(x.device, x.uniformBufferMemory)
+  destroyBuffer(x.device, x.uniformBuffer)
+  freeMemory(x.device, x.storageBufferMemory)
+  destroyBuffer(x.device, x.storageBuffer)
+  destroyPipeline(x.device, x.pipeline)
+  destroyPipelineLayout(x.device, x.pipelineLayout)
+  freeDescriptorSets(x.device, x.descriptorPool, x.descriptorSets)
+  destroyDescriptorPool(x.device, x.descriptorPool)
+  destroyDescriptorSetLayout(x.device, x.descriptorSetLayout)
+  destroyCommandPool(x.device, x.commandPool)
+  destroyDevice(x.device)
   when defined(vkDebug):
-    vkDestroyDebugUtilsMessengerEXT(x.instance, x.debugUtilsMessenger, nil)
-  vkDestroyInstance(x.instance, nil)
+    destroyDebugUtilsMessenger(x.instance, x.debugUtilsMessenger)
+  destroyInstance(x.instance)
 
 proc newMandelbrotGenerator*(width, height: int32): MandelbrotGenerator =
   ## Create a generator with the width and the height of the image.
