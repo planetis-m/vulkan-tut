@@ -54,7 +54,8 @@ proc getQueueFamilyProperties*(physicalDevice: VkPhysicalDevice): seq[VkQueueFam
 proc getMemoryProperties*(physicalDevice: VkPhysicalDevice): VkPhysicalDeviceMemoryProperties =
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, result.addr)
 
-proc createDevice*(physicalDevice: VkPhysicalDevice, deviceCreateInfo: VkDeviceCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkDevice =
+proc createDevice*(physicalDevice: VkPhysicalDevice, deviceCreateInfo: VkDeviceCreateInfo,
+                   allocator: ptr VkAllocationCallbacks = nil): VkDevice =
   checkVkResult vkCreateDevice(physicalDevice, deviceCreateInfo.addr, allocator, result.addr)
 
 proc getDeviceQueue*(device: VkDevice, queueFamilyIndex: uint32, queueIndex: uint32): VkQueue =
@@ -72,10 +73,12 @@ proc allocateMemory*(device: VkDevice, allocateInfo: VkMemoryAllocateInfo, alloc
 proc bindBufferMemory*(device: VkDevice, buffer: VkBuffer, memory: VkDeviceMemory, memoryOffset: VkDeviceSize) =
   checkVkResult vkBindBufferMemory(device, buffer, memory, memoryOffset)
 
-proc createDescriptorSetLayout*(device: VkDevice, createInfo: VkDescriptorSetLayoutCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkDescriptorSetLayout =
+proc createDescriptorSetLayout*(device: VkDevice, createInfo: VkDescriptorSetLayoutCreateInfo,
+                                allocator: ptr VkAllocationCallbacks = nil): VkDescriptorSetLayout =
   checkVkResult vkCreateDescriptorSetLayout(device, createInfo.addr, allocator, result.addr)
 
-proc createDescriptorPool*(device: VkDevice, createInfo: VkDescriptorPoolCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkDescriptorPool =
+proc createDescriptorPool*(device: VkDevice, createInfo: VkDescriptorPoolCreateInfo,
+                           allocator: ptr VkAllocationCallbacks = nil): VkDescriptorPool =
   checkVkResult vkCreateDescriptorPool(device, createInfo.addr, allocator, result.addr)
 
 proc allocateDescriptorSets*(device: VkDevice, allocateInfo: VkDescriptorSetAllocateInfo): VkDescriptorSet =
@@ -83,16 +86,20 @@ proc allocateDescriptorSets*(device: VkDevice, allocateInfo: VkDescriptorSetAllo
   checkVkResult vkAllocateDescriptorSets(device, allocateInfo.addr, descriptorSet.addr)
   result = descriptorSet
 
-proc updateDescriptorSets*(device: VkDevice, descriptorWrites: openarray[VkWriteDescriptorSet], descriptorCopies: openarray[VkCopyDescriptorSet]) =
+proc updateDescriptorSets*(device: VkDevice, descriptorWrites: openarray[VkWriteDescriptorSet],
+                           descriptorCopies: openarray[VkCopyDescriptorSet]) =
   vkUpdateDescriptorSets(device, descriptorWrites.len.uint32, if descriptorWrites.len == 0: nil else: cast[ptr VkWriteDescriptorSet](descriptorWrites), descriptorCopies.len.uint32, if descriptorWrites.len == 0: nil else: cast[ptr VkCopyDescriptorSet](descriptorCopies))
 
-proc createShaderModule*(device: VkDevice, createInfo: VkShaderModuleCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkShaderModule =
+proc createShaderModule*(device: VkDevice, createInfo: VkShaderModuleCreateInfo,
+                         allocator: ptr VkAllocationCallbacks = nil): VkShaderModule =
   checkVkResult vkCreateShaderModule(device, createInfo.addr, allocator, result.addr)
 
 proc createPipelineLayout*(device: VkDevice, createInfo: VkPipelineLayoutCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkPipelineLayout =
   checkVkResult vkCreatePipelineLayout(device, createInfo.addr, allocator, result.addr)
 
-proc createComputePipelines*(device: VkDevice, pipelineCache: VkPipelineCache, createInfos: openarray[VkComputePipelineCreateInfo], allocator: ptr VkAllocationCallbacks = nil): VkPipeline =
+proc createComputePipelines*(device: VkDevice, pipelineCache: VkPipelineCache,
+                             createInfos: openarray[VkComputePipelineCreateInfo],
+                             allocator: ptr VkAllocationCallbacks = nil): VkPipeline =
   checkVkResult vkCreateComputePipelines(device, pipelineCache, createInfos.len.uint32, if createInfos.len == 0: nil else: cast[ptr VkComputePipelineCreateInfo](createInfos), allocator, result.addr)
 
 proc createFence*(device: VkDevice, createInfo: VkFenceCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkFence =
@@ -107,10 +114,12 @@ proc waitForFences*(device: VkDevice, fences: openarray[VkFence], waitAll: VkBoo
 proc waitForFence*(device: VkDevice, fence: VkFence, waitAll: VkBool32, timeout: uint64) =
   checkVkResult vkWaitForFences(device, 1, fence.addr, waitAll, timeout)
 
-proc createDebugUtilsMessengerEXT*(instance: VkInstance, createInfo: VkDebugUtilsMessengerCreateInfoEXT, allocator: ptr VkAllocationCallbacks = nil): VkDebugUtilsMessengerEXT =
+proc createDebugUtilsMessengerEXT*(instance: VkInstance, createInfo: VkDebugUtilsMessengerCreateInfoEXT,
+                                   allocator: ptr VkAllocationCallbacks = nil): VkDebugUtilsMessengerEXT =
   checkVkResult vkCreateDebugUtilsMessengerEXT(instance, createInfo.addr, allocator, result.addr)
 
-proc createCommandPool*(device: VkDevice, createInfo: VkCommandPoolCreateInfo, allocator: ptr VkAllocationCallbacks = nil): VkCommandPool =
+proc createCommandPool*(device: VkDevice, createInfo: VkCommandPoolCreateInfo,
+                        allocator: ptr VkAllocationCallbacks = nil): VkCommandPool =
   checkVkResult vkCreateCommandPool(device, createInfo.addr, allocator, result.addr)
 
 proc allocateCommandBuffers*(device: VkDevice, allocateInfo: VkCommandBufferAllocateInfo): VkCommandBuffer =
@@ -119,7 +128,9 @@ proc allocateCommandBuffers*(device: VkDevice, allocateInfo: VkCommandBufferAllo
 proc beginCommandBuffer*(commandBuffer: VkCommandBuffer, beginInfo: VkCommandBufferBeginInfo) =
   checkVkResult vkBeginCommandBuffer(commandBuffer, beginInfo.addr)
 
-proc cmdBindDescriptorSets*(commandBuffer: VkCommandBuffer, pipelineBindPoint: VkPipelineBindPoint, layout: VkPipelineLayout, firstSet: uint32, descriptorSets: openarray[VkDescriptorSet], dynamicOffsets: openarray[uint32]) =
+proc cmdBindDescriptorSets*(commandBuffer: VkCommandBuffer, pipelineBindPoint: VkPipelineBindPoint,
+    layout: VkPipelineLayout, firstSet: uint32, descriptorSets: openarray[VkDescriptorSet],
+    dynamicOffsets: openarray[uint32]) =
   vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, layout, firstSet, descriptorSets.len.uint32, if descriptorSets.len == 0: nil else: cast[ptr VkDescriptorSet](descriptorSets), dynamicOffsets.len.uint32, if dynamicOffsets.len == 0: nil else: cast[ptr uint32](dynamicOffsets))
 
 proc endCommandBuffer*(commandBuffer: VkCommandBuffer) =
@@ -149,7 +160,8 @@ proc destroyDescriptorPool*(device: VkDevice, descriptorPool: VkDescriptorPool, 
   if descriptorPool != 0.VkDescriptorPool:
     vkDestroyDescriptorPool(device, descriptorPool, allocator)
 
-proc destroyDescriptorSetLayout*(device: VkDevice, descriptorSetLayout: VkDescriptorSetLayout, allocator: ptr VkAllocationCallbacks = nil) =
+proc destroyDescriptorSetLayout*(device: VkDevice, descriptorSetLayout: VkDescriptorSetLayout,
+                                 allocator: ptr VkAllocationCallbacks = nil) =
   if descriptorSetLayout != 0.VkDescriptorSetLayout:
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, allocator)
 
@@ -168,3 +180,12 @@ proc destroyDebugUtilsMessenger*(instance: VkInstance, debugUtilsMessenger: VkDe
 proc destroyInstance*(instance: VkInstance, allocator: ptr VkAllocationCallbacks = nil) =
   if instance != 0.VkInstance:
     vkDestroyInstance(instance, allocator)
+
+proc destroyShaderModule*(device: VkDevice, shaderModule: VkShaderModule,
+                         allocator: ptr VkAllocationCallbacks = nil) =
+  if shaderModule != 0.VkShaderModule:
+    vkDestroyShaderModule(device, shaderModule, allocator)
+
+proc destroyFence*(device: VkDevice, fence: VkFence, allocator: ptr VkAllocationCallbacks = nil) =
+  if fence != 0.VkFence:
+    vkDestroyFence(device, fence, allocator)

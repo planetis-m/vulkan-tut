@@ -151,13 +151,13 @@ proc main() =
   doAssert vkDeviceWaitIdle(device) == VkSuccess
 
   # Cleanup resources
-  vkDestroyCommandPool(device, commandPool, nil)
-  vkDestroyPipeline(device, pipeline, nil)
-  vkDestroyPipelineLayout(device, pipelineLayout, nil)
-  vkDestroyShaderModule(device, shaderModule, nil)
-  vkDestroyDevice(device, nil)
+  destroyCommandPool(device, commandPool)
+  destroyPipeline(device, pipeline)
+  destroyPipelineLayout(device, pipelineLayout)
+  destroyShaderModule(device, shaderModule)
+  destroyDevice(device)
   when defined(vkDebug):
-    vkDestroyDebugUtilsMessengerEXT(instance, debugUtilsMessenger, nil)
-  vkDestroyInstance(instance, nil)
+    destroyDebugUtilsMessenger(instance, debugUtilsMessenger)
+  destroyInstance(instance)
 
 main()

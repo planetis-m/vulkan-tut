@@ -320,7 +320,7 @@ proc createComputePipeline(x: var MandelbrotGenerator) =
     )
   ]
   x.pipeline = createComputePipelines(x.device, 0.VkPipelineCache, createInfos)
-  vkDestroyShaderModule(x.device, computeShaderModule, nil)
+  destroyShaderModule(x.device, computeShaderModule)
 
 proc createCommandBuffer(x: var MandelbrotGenerator) =
   # Create a command pool
@@ -371,7 +371,7 @@ proc submitCommandBuffer(x: MandelbrotGenerator) =
   when defined(useRenderDoc): endFrameCapture(x.instance)
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
   waitForFence(x.device, fence, VkBool32(true), high(uint64))
-  vkDestroyFence(x.device, fence, nil)
+  destroyFence(x.device, fence)
 
 when defined(vkDebug):
   proc debugCallback(messageSeverity: VkDebugUtilsMessageSeverityFlagBitsEXT,
