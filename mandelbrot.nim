@@ -99,8 +99,8 @@ proc createInstance(x: var MandelbrotGenerator) =
   let instanceCreateInfo = newVkInstanceCreateInfo(
     pNext = when defined(vkDebug): addr features else: nil,
     pApplicationInfo = applicationInfo.addr,
-    enabledLayerNames = layers,
-    enabledExtensionNames = extensions
+    pEnabledLayerNames = layers,
+    pEnabledExtensionNames = extensions
   )
   x.instance = createInstance(instanceCreateInfo)
 
@@ -131,8 +131,8 @@ proc createDevice(x: var MandelbrotGenerator) =
   let layers = getLayers()
   let deviceCreateInfo = newVkDeviceCreateInfo(
     queueCreateInfos = [queueCreateInfo],
-    enabledLayerNames = layers,
-    enabledExtensionNames = [],
+    pEnabledLayerNames = layers,
+    pEnabledExtensionNames = [],
     enabledFeatures = []
   )
   # Create a logical device

@@ -57,8 +57,8 @@ proc main() =
   let instanceInfo = newVkInstanceCreateInfo(
     pNext = when defined(vkDebug): addr features else: nil,
     pApplicationInfo = addr applicationInfo,
-    enabledLayerNames = layers,
-    enabledExtensionNames = extensions
+    pEnabledLayerNames = layers,
+    pEnabledExtensionNames = extensions
   )
   let instance = createInstance(instanceInfo)
   vkInit(instance, load1_2 = false, load1_3 = false)
@@ -84,8 +84,8 @@ proc main() =
   )
   let deviceCreateInfo = newVkDeviceCreateInfo(
     queueCreateInfos = [deviceQueueCreateInfo],
-    enabledLayerNames = [],
-    enabledExtensionNames = [],
+    pEnabledLayerNames = [],
+    pEnabledExtensionNames = [],
     enabledFeatures = []
   )
   let device = createDevice(physicalDevice, deviceCreateInfo)
