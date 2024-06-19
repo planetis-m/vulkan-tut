@@ -35,7 +35,6 @@ proc cleanup(x: MandelbrotGenerator) =
   destroyBuffer(x.device, x.storageBuffer)
   destroyPipeline(x.device, x.pipeline)
   destroyPipelineLayout(x.device, x.pipelineLayout)
-  freeDescriptorSets(x.device, x.descriptorPool, x.descriptorSets)
   destroyDescriptorPool(x.device, x.descriptorPool)
   destroyDescriptorSetLayout(x.device, x.descriptorSetLayout)
   destroyCommandPool(x.device, x.commandPool)
@@ -89,9 +88,8 @@ proc createInstance(x: var MandelbrotGenerator) =
         "VK_LAYER_KHRONOS_validation" == cast[cstring](it.layerName.addr))
     assert foundValidationLayer, "Validation layer required, but not available"
     # Shader printf is a feature of the validation layers that needs to be enabled
-    let enables = [VkValidationFeatureEnableEXT.DebugPrintf]
     let features = newVkValidationFeaturesEXT(
-      enabledValidationFeatures = enables,
+      enabledValidationFeatures = [VkValidationFeatureEnableEXT.DebugPrintf],
       disabledValidationFeatures = []
     )
   # Create a Vulkan instance
@@ -149,7 +147,7 @@ proc findMemoryType(physicalDevice: VkPhysicalDevice, typeFilter: uint32,
     let memoryType = memoryProperties.memoryTypes[i]
     if (typeFilter and (1'u32 shl i.uint32)) != 0 and
         memoryType.propertyFlags >= properties and
-        size.uint64 <= memoryProperties.memoryHeaps[memoryType.heapIndex].size.uint64:
+        size <= memoryProperties.memoryHeaps[memoryType.heapIndex].size:
       return i.uint32
   assert false, "Failed to find suitable memory type"
 
@@ -370,7 +368,7 @@ proc submitCommandBuffer(x: MandelbrotGenerator) =
   queueSubmit(x.queue, submitInfos, fence)
   when defined(useRenderDoc): endFrameCapture(x.instance)
   # Wait for the fence to be signaled, indicating completion of the command buffer execution
-  waitForFence(x.device, fence, VkBool32(true), high(uint64))
+  waitForFence(x.device, fence, true.VkBool32, high(uint64))
   destroyFence(x.device, fence)
 
 when defined(vkDebug):
@@ -386,7 +384,7 @@ when defined(vkDebug):
         # Extract the part of the message after the delimiter
         message = message.substr(pos + len(delimiter))
     stderr.writeLine(message)
-    return VkBool32(false)
+    return false.VkBool32
 
   proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
     let severityFlags = VkDebugUtilsMessageSeverityFlagsEXT{

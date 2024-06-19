@@ -136,6 +136,9 @@ proc cmdBindDescriptorSets*(commandBuffer: VkCommandBuffer, pipelineBindPoint: V
 proc endCommandBuffer*(commandBuffer: VkCommandBuffer) =
   checkVkResult vkEndCommandBuffer(commandBuffer)
 
+proc deviceWaitIdle*(device: VkDevice) =
+  checkVkResult vkDeviceWaitIdle(device)
+
 proc freeMemory*(device: VkDevice, memory: VkDeviceMemory, allocator: ptr VkAllocationCallbacks = nil) =
   if memory != 0.VkDeviceMemory:
     vkFreeMemory(device, memory, allocator)
@@ -152,9 +155,10 @@ proc destroyPipelineLayout*(device: VkDevice, pipelineLayout: VkPipelineLayout, 
   if pipelineLayout != 0.VkPipelineLayout:
     vkDestroyPipelineLayout(device, pipelineLayout, allocator)
 
-proc freeDescriptorSets*(device: VkDevice, descriptorPool: VkDescriptorPool, descriptorSets: seq[VkDescriptorSet]) =
+proc freeDescriptorSets*(device: VkDevice, descriptorPool: VkDescriptorPool,
+                         descriptorSets: openarray[VkDescriptorSet]) =
   if descriptorSets.len > 0:
-    discard vkFreeDescriptorSets(device, descriptorPool, descriptorSets.len.uint32, descriptorSets[0].addr)
+    discard vkFreeDescriptorSets(device, descriptorPool, descriptorSets.len.uint32, cast[ptr VkDescriptorSet](descriptorSets))
 
 proc destroyDescriptorPool*(device: VkDevice, descriptorPool: VkDescriptorPool, allocator: ptr VkAllocationCallbacks = nil) =
   if descriptorPool != 0.VkDescriptorPool:

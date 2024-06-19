@@ -148,7 +148,7 @@ proc main() =
   when defined(useRenderDoc): startFrameCapture(instance)
   queueSubmit(queue, [submitInfo], 0.VkFence)
   when defined(useRenderDoc): endFrameCapture(instance)
-  doAssert vkDeviceWaitIdle(device) == VkSuccess
+  deviceWaitIdle(device)
 
   # Cleanup resources
   destroyCommandPool(device, commandPool)
