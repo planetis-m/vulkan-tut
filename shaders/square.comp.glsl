@@ -1,5 +1,5 @@
 #version 450
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 32) in;
 
 layout(std430, binding = 0) readonly buffer lay0 {
   int inbuf[];

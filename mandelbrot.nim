@@ -142,7 +142,7 @@ proc createDevice(x: var MandelbrotGenerator) =
 proc findMemoryType(physicalDevice: VkPhysicalDevice, typeFilter: uint32,
     size: VkDeviceSize, properties: VkMemoryPropertyFlags): uint32 =
   # Find a suitable memory type for a Vulkan physical device
-  let memoryProperties = getMemoryProperties(physicalDevice)
+  let memoryProperties = getPhysicalDeviceMemoryProperties(physicalDevice)
   for i in 0 ..< memoryProperties.memoryTypeCount.int:
     let memoryType = memoryProperties.memoryTypes[i]
     if (typeFilter and (1'u32 shl i.uint32)) != 0 and
@@ -165,8 +165,9 @@ proc createBuffer(x: MandelbrotGenerator, size: VkDeviceSize, usage: VkBufferUsa
   # Allocate memory for the buffer
   let allocInfo = newVkMemoryAllocateInfo(
     allocationSize = bufferMemoryRequirements.size,
-    memoryTypeIndex = findMemoryType(x.physicalDevice, bufferMemoryRequirements.memoryTypeBits,
-        bufferMemoryRequirements.size, properties)
+    memoryTypeIndex = findMemoryType(x.physicalDevice,
+                                     bufferMemoryRequirements.memoryTypeBits,
+                                     bufferMemoryRequirements.size, properties)
   )
   let bufferMemory = allocateMemory(x.device, allocInfo)
   # Bind the memory to the buffer
@@ -342,8 +343,8 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   # Bind the compute pipeline
   cmdBindPipeline(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipeline)
   # Bind the descriptor set
-  cmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute, x.pipelineLayout,
-      0, x.descriptorSets, [])
+  cmdBindDescriptorSets(x.commandBuffer, VkPipelineBindPoint.Compute,
+                        x.pipelineLayout, 0, x.descriptorSets, [])
   # Dispatch the compute work
   let numWorkgroupX = ceilDiv(x.width.uint32, x.workgroupSize.x)
   let numWorkgroupY = ceilDiv(x.height.uint32, x.workgroupSize.y)
