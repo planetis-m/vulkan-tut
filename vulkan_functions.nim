@@ -231,8 +231,6 @@ proc createComputePipeline*(device: VkDevice,
     )
   ]
   result = createComputePipelines(device, VkPipelineCache(0), createInfos)
-  # Clean up shader module
-  destroyShaderModule(device, computeShaderModule)
 
 proc createCommandPool*(device: VkDevice, queueFamilyIndex: uint32): VkCommandPool =
   let commandPoolCreateInfo = newVkCommandPoolCreateInfo(

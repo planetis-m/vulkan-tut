@@ -17,8 +17,8 @@ proc main() =
   let device = createDevice(physicalDevice, queueFamilyIndex, layers, [], [])
   let queue = getDeviceQueue(device, queueFamilyIndex, 0)
 
-  let shaderPath = "build/shaders/hello_world.comp.spv"
-  let shaderModule = createShaderModule(device, readFile(shaderPath))
+  let shaderSPV = readFile("build/shaders/hello_world.comp.spv")
+  let shaderModule = createShaderModule(device, shaderSPV)
   let pipelineLayoutCreateInfo = newVkPipelineLayoutCreateInfo(
     setLayouts = [],
     pushConstantRanges = []
@@ -40,6 +40,7 @@ proc main() =
   destroyCommandPool(device, commandPool)
   destroyPipeline(device, pipeline)
   destroyPipelineLayout(device, pipelineLayout)
+  destroyShaderModule(device, shaderModule)
   destroyDevice(device)
   when defined(vkDebug):
     destroyDebugUtilsMessenger(instance, debugUtilsMessenger)

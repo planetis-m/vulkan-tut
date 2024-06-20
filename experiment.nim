@@ -84,7 +84,6 @@ proc main =
   let descriptorSets = createDescriptorSets(device, descriptorPool, descriptorSetLayout, bufferInfos)
 
   let queue = getDeviceQueue(device, queueFamilyIndex, 0)
-  let shaderPath = "build/shaders/mandelbrot.comp.spv"
   let specializationEntries = [
     newVkSpecializationMapEntry(
       constantID = 0,
@@ -99,11 +98,15 @@ proc main =
   ]
   let workgroupSize = WorkgroupSize(x: 32, y: 32)
   let dataSize = sizeof(WorkgroupSize).uint
+  let shaderSPV = readFile("build/shaders/mandelbrot.comp.spv")
 
-  let computeShaderModule = createShaderModule(device, readFile(shaderPath))
+  let computeShaderModule = createShaderModule(device, shaderSPV)
   let pipelineLayout = createPipelineLayout(device, descriptorSetLayout)
   let pipeline = createComputePipeline(device, computeShaderModule, pipelineLayout,
                                       specializationEntries, addr(workgroupSize), dataSize)
+
+  # Clean up shader module
+  destroyShaderModule(device, computeShaderModule)
   # Create command pool
   let commandPool = createCommandPool(device, queueFamilyIndex)
 
