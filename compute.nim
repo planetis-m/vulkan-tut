@@ -61,7 +61,6 @@ proc main =
   )
   let instance = createInstance(instanceCreateInfo)
   vkInit(instance, load1_2 = false, load1_3 = false)
-  when defined(useRenderDoc): rDocInit()
   # Enumerate physical devices
   let physicalDevices = enumeratePhysicalDevices(instance)
   assert physicalDevices.len > 0, "Cannot find any physical devices."

@@ -64,7 +64,6 @@ proc main() =
   when defined(vkDebug):
     loadVkExtDebugUtils()
     let debugUtilsMessenger = setupDebugUtilsMessenger(instance)
-  when defined(useRenderDoc): rDocInit()
   let physicalDevices = enumeratePhysicalDevices(instance)
   assert physicalDevices.len > 0, "Cannot find any physical devices."
   let physicalDevice = physicalDevices[0]

@@ -31,8 +31,6 @@ proc main =
   when defined(vkDebug):
     loadVkExtDebugUtils()
     let debugUtilsMessenger = setupDebugUtilsMessenger(instance)
-  when defined(useRenderDoc):
-    rDocInit()
   let physicalDevice = findPhysicalDevice(instance)
   let queueFamilyIndex = getComputeQueueFamilyIndex(physicalDevice)
   let device = createDevice(physicalDevice, queueFamilyIndex, layers, [], [])

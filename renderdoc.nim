@@ -30,79 +30,98 @@ proc getRDocAPI(): ptr RENDERDOC_API_1_6_0 =
     raise newException(LibraryError, "RenderDoc initialization failed")
   result = rDocAPI
 
-proc rDocInit*() =
-  rDocAPI = getRDocAPI()
+# proc rDocInit*() =
+#   rDocAPI = getRDocAPI()
 
-proc startFrameCapture*(instance: VkInstance) =
-  let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
-  rDocAPI.StartFrameCapture(device, nil)
+import std/macros
 
-proc endFrameCapture*(instance: VkInstance) =
-  let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
-  discard rDocAPI.EndFrameCapture(device, nil)
+macro wrapLibLoading(f: untyped): untyped =
+  f.expectKind nnkStmtList
+  result = newStmtList()
 
-proc setCaptureTitle*(title: string) =
-  rDocAPI.SetCaptureTitle(title.cstring)
+  template loadLib: untyped =
+    if not initialized:
+      rDocAPI = getRDocAPI()
 
-proc discardFrameCapture*(device: RENDERDOC_DevicePointer, wndHandle: RENDERDOC_WindowHandle): bool =
-  rDocAPI.DiscardFrameCapture(device, wndHandle) == 1
+  for child in f.children:
+    if child.kind == nnkCommentStmt:
+      continue
+    child.expectKind nnkProcDef
+    var rDocProc = copy child
+    rDocProc.body.insert(0, getAst(loadLib()))
+    result.add rDocProc
 
-proc isFrameCapturing*(): bool =
-  rDocAPI.IsFrameCapturing() == 1
+wrapLibLoading:
+  proc startFrameCapture*(instance: VkInstance) =
+    let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
+    rDocAPI.StartFrameCapture(device, nil)
 
-proc triggerCapture*() =
-  rDocAPI.TriggerCapture()
+  proc endFrameCapture*(instance: VkInstance) =
+    let device = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance)
+    discard rDocAPI.EndFrameCapture(device, nil)
 
-proc triggerMultiFrameCapture*(numFrames: uint32) =
-  rDocAPI.TriggerMultiFrameCapture(numFrames)
+  proc setCaptureTitle*(title: string) =
+    rDocAPI.SetCaptureTitle(title.cstring)
 
-proc setActiveWindow*(device: RENDERDOC_DevicePointer, wndHandle: RENDERDOC_WindowHandle) =
-  rDocAPI.SetActiveWindow(device, wndHandle)
+  proc discardFrameCapture*(device: RENDERDOC_DevicePointer, wndHandle: RENDERDOC_WindowHandle): bool =
+    rDocAPI.DiscardFrameCapture(device, wndHandle) == 1
 
-proc showReplayUI*(): bool =
-  rDocAPI.ShowReplayUI() == 1
+  proc isFrameCapturing*(): bool =
+    rDocAPI.IsFrameCapturing() == 1
 
-proc setCaptureFileComments(filePath, comments: string) =
-  rDocAPI.SetCaptureFileComments(filePath.cstring, comments.cstring)
+  proc triggerCapture*() =
+    rDocAPI.TriggerCapture()
 
-proc getCapture*(idx: uint32, filename: string, pathlength: out uint32, timestamp: out uint64): bool =
-  rDocAPI.GetCapture(idx, filename.cstring, pathlength.addr, timestamp.addr) == 1
+  proc triggerMultiFrameCapture*(numFrames: uint32) =
+    rDocAPI.TriggerMultiFrameCapture(numFrames)
 
-proc getNumCaptures*(): uint32 =
-  rDocAPI.GetNumCaptures()
+  proc setActiveWindow*(device: RENDERDOC_DevicePointer, wndHandle: RENDERDOC_WindowHandle) =
+    rDocAPI.SetActiveWindow(device, wndHandle)
 
-proc setCaptureFilePathTemplate*(pathtemplate: string) =
-  rDocAPI.SetCaptureFilePathTemplate(pathtemplate.cstring)
+  proc showReplayUI*(): bool =
+    rDocAPI.ShowReplayUI() == 1
 
-proc getCaptureFilePathTemplate*(): string =
-  $rDocAPI.GetCaptureFilePathTemplate()
+  proc setCaptureFileComments(filePath, comments: string) =
+    rDocAPI.SetCaptureFileComments(filePath.cstring, comments.cstring)
 
-proc unloadCrashHandler*() =
-  rDocAPI.UnloadCrashHandler()
+  proc getCapture*(idx: uint32, filename: string, pathlength: out uint32, timestamp: out uint64): bool =
+    rDocAPI.GetCapture(idx, filename.cstring, pathlength.addr, timestamp.addr) == 1
 
-proc removeHooks*() =
-  rDocAPI.RemoveHooks()
+  proc getNumCaptures*(): uint32 =
+    rDocAPI.GetNumCaptures()
 
-proc maskOverlayBits*(And, Or: uint32) =
-  rDocAPI.MaskOverlayBits(And, Or)
+  proc setCaptureFilePathTemplate*(pathtemplate: string) =
+    rDocAPI.SetCaptureFilePathTemplate(pathtemplate.cstring)
 
-proc getOverlayBits*(): uint32 =
-  rDocAPI.GetOverlayBits()
+  proc getCaptureFilePathTemplate*(): string =
+    $rDocAPI.GetCaptureFilePathTemplate()
 
-proc setCaptureKeys*(keys: openarray[RENDERDOC_InputButton]) =
-  rDocAPI.SetCaptureKeys(cast[ptr[RENDERDOC_InputButton]](keys), keys.len.cint)
+  proc unloadCrashHandler*() =
+    rDocAPI.UnloadCrashHandler()
 
-proc setFocusToggleKeys*(keys: openarray[RENDERDOC_InputButton]) =
-  rDocAPI.SetFocusToggleKeys(cast[ptr[RENDERDOC_InputButton]](keys), keys.len.cint)
+  proc removeHooks*() =
+    rDocAPI.RemoveHooks()
 
-proc getCaptureOptionF32*(opt: RENDERDOC_CaptureOption): float32 =
-  rDocAPI.GetCaptureOptionF32(opt)
+  proc maskOverlayBits*(And, Or: uint32) =
+    rDocAPI.MaskOverlayBits(And, Or)
 
-proc getCaptureOptionU32*(opt: RENDERDOC_CaptureOption): uint32 =
-  rDocAPI.GetCaptureOptionU32(opt)
+  proc getOverlayBits*(): uint32 =
+    rDocAPI.GetOverlayBits()
 
-proc setCaptureOptionU32*(opt: RENDERDOC_CaptureOption, val: uint32): bool =
-  rDocAPI.SetCaptureOptionU32(opt, val) == 1
+  proc setCaptureKeys*(keys: openarray[RENDERDOC_InputButton]) =
+    rDocAPI.SetCaptureKeys(cast[ptr[RENDERDOC_InputButton]](keys), keys.len.cint)
 
-proc setCaptureOptionF32*(opt: RENDERDOC_CaptureOption, val: float32): bool =
-  rDocAPI.SetCaptureOptionF32(opt, val) == 1
+  proc setFocusToggleKeys*(keys: openarray[RENDERDOC_InputButton]) =
+    rDocAPI.SetFocusToggleKeys(cast[ptr[RENDERDOC_InputButton]](keys), keys.len.cint)
+
+  proc getCaptureOptionF32*(opt: RENDERDOC_CaptureOption): float32 =
+    rDocAPI.GetCaptureOptionF32(opt)
+
+  proc getCaptureOptionU32*(opt: RENDERDOC_CaptureOption): uint32 =
+    rDocAPI.GetCaptureOptionU32(opt)
+
+  proc setCaptureOptionU32*(opt: RENDERDOC_CaptureOption, val: uint32): bool =
+    rDocAPI.SetCaptureOptionU32(opt, val) == 1
+
+  proc setCaptureOptionF32*(opt: RENDERDOC_CaptureOption, val: float32): bool =
+    rDocAPI.SetCaptureOptionF32(opt, val) == 1
