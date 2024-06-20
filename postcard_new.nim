@@ -24,7 +24,7 @@ proc main() =
     pushConstantRanges = []
   )
   let pipelineLayout = createPipelineLayout(device, pipelineLayoutCreateInfo)
-  let pipeline = createComputePipeline(device, shaderModule, pipelineLayout, [], nil, 0)
+  let pipeline = createComputePipeline(device, shaderModule, pipelineLayout, specializationEntries = [], nil, 0)
   # Create command pool
   let commandPool = createCommandPool(device, queueFamilyIndex)
 
@@ -32,19 +32,9 @@ proc main() =
   let commandBuffer = allocateCommandBuffer(device, commandPool)
 
   # Record command buffer
-  recordCommandBuffer(
-    commandBuffer = commandBuffer,
-    pipeline = pipeline,
-    pipelineLayout = pipelineLayout,
-    descriptorSets = []
-  )
+  recordCommandBuffer(commandBuffer, pipeline, pipelineLayout, descriptorSets = [])
   # Submit command buffer
-  submitCommandBuffer(
-    device = device,
-    queue = queue,
-    commandBuffer = commandBuffer,
-    instance = instance
-  )
+  submitCommandBuffer(device, queue, commandBuffer, instance)
 
   # Cleanup resources
   destroyCommandPool(device, commandPool)
