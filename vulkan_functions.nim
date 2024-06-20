@@ -167,13 +167,16 @@ proc createDescriptorSets*(device: VkDevice, descriptorPool: VkDescriptorPool,
   let descriptorSet = allocateDescriptorSets(device, descriptorSetAllocateInfo)
   result = @[descriptorSet]
   # Create write descriptor sets
-  var writeDescriptorSets: seq[VkWriteDescriptorSet] = @[]
-  for i, (buffer, size, descriptorType) in bufferInfos:
+  var descriptorBufferInfos: seq[VkDescriptorBufferInfo] = @[]
+  for i, (buffer, size, _) in bufferInfos:
     let descriptorBufferInfo = newVkDescriptorBufferInfo(
       buffer = buffer,
       offset = 0.VkDeviceSize,
       range = size
     )
+    descriptorBufferInfos.add(descriptorBufferInfo)
+  var writeDescriptorSets: seq[VkWriteDescriptorSet] = @[]
+  for i, (_, _, descriptorType) in bufferInfos:
     let writeDescriptorSet = newVkWriteDescriptorSet(
       dstSet = result[0],
       dstBinding = i.uint32,
@@ -181,7 +184,7 @@ proc createDescriptorSets*(device: VkDevice, descriptorPool: VkDescriptorPool,
       descriptorCount = 1,
       descriptorType = descriptorType,
       pImageInfo = nil,
-      pBufferInfo = descriptorBufferInfo.addr,
+      pBufferInfo = addr descriptorBufferInfos[i],
       pTexelBufferView = nil
     )
     writeDescriptorSets.add(writeDescriptorSet)
