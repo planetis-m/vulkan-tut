@@ -101,7 +101,7 @@ proc main =
   let shaderSPV = readFile("build/shaders/mandelbrot.comp.spv")
 
   let computeShaderModule = createShaderModule(device, shaderSPV)
-  let pipelineLayout = createPipelineLayout(device, descriptorSetLayout)
+  let pipelineLayout = createPipelineLayout(device, [descriptorSetLayout])
   let pipeline = createComputePipeline(device, computeShaderModule, pipelineLayout,
                                       specializationEntries, addr(workgroupSize), dataSize)
 

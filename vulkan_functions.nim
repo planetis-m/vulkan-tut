@@ -198,9 +198,9 @@ proc createShaderModule*(device: VkDevice,
   result = createShaderModule(device, shaderModuleCreateInfo)
 
 proc createPipelineLayout*(device: VkDevice,
-                           descriptorSetLayout: VkDescriptorSetLayout): VkPipelineLayout =
+                           descriptorSetLayouts: openarray[VkDescriptorSetLayout]): VkPipelineLayout =
   let pipelineLayoutCreateInfo = newVkPipelineLayoutCreateInfo(
-    setLayouts = [descriptorSetLayout],
+    setLayouts = descriptorSetLayouts,
     pushConstantRanges = []
   )
   result = createPipelineLayout(device, pipelineLayoutCreateInfo)

@@ -19,11 +19,7 @@ proc main() =
 
   let shaderSPV = readFile("build/shaders/hello_world.comp.spv")
   let shaderModule = createShaderModule(device, shaderSPV)
-  let pipelineLayoutCreateInfo = newVkPipelineLayoutCreateInfo(
-    setLayouts = [],
-    pushConstantRanges = []
-  )
-  let pipelineLayout = createPipelineLayout(device, pipelineLayoutCreateInfo)
+  let pipelineLayout = createPipelineLayout(device, descriptorSetLayouts = [])
   let pipeline = createComputePipeline(device, shaderModule, pipelineLayout, specializationEntries = [], nil, 0)
   # Create command pool
   let commandPool = createCommandPool(device, queueFamilyIndex)
