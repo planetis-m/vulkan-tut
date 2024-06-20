@@ -24,8 +24,7 @@ proc main() =
     pushConstantRanges = []
   )
   let pipelineLayout = createPipelineLayout(device, pipelineLayoutCreateInfo)
-  let pipeline = createComputePipeline(device, shaderModule, pipelineLayout,
-                                      [], nil, 0)
+  let pipeline = createComputePipeline(device, shaderModule, pipelineLayout, [], nil, 0)
   # Create command pool
   let commandPool = createCommandPool(device, queueFamilyIndex)
 
@@ -51,7 +50,6 @@ proc main() =
   destroyCommandPool(device, commandPool)
   destroyPipeline(device, pipeline)
   destroyPipelineLayout(device, pipelineLayout)
-  destroyShaderModule(device, shaderModule)
   destroyDevice(device)
   when defined(vkDebug):
     destroyDebugUtilsMessenger(instance, debugUtilsMessenger)
