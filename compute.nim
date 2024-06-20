@@ -286,7 +286,7 @@ proc main =
   # Map the output buffer to read the results
   let outBufferPtr = mapMemory(device, bufferMemory, alignedSize, bufferSize, 0.VkMemoryMapFlags)
   let t2 = cpuTime()
-  let outData = cast[ptr UncheckedArray[int32]](outBuffer)
+  let outData = cast[ptr UncheckedArray[int32]](outBufferPtr)
   # echo "OUTPUT: ", outBufferPtr[]
   for i in 0 ..< NumElements:
     doAssert outData[i] == int32(i*i)
