@@ -251,7 +251,7 @@ proc allocateCommandBuffer*(device: VkDevice, commandPool: VkCommandPool): VkCom
 proc recordCommandBuffer*(commandBuffer: VkCommandBuffer,
                           pipeline: VkPipeline,
                           pipelineLayout: VkPipelineLayout,
-                          descriptorSets: seq[VkDescriptorSet],
+                          descriptorSets: openarray[VkDescriptorSet],
                           groupCountX, groupCountY, groupCountZ: uint32 = 1) =
   let commandBufferBeginInfo = newVkCommandBufferBeginInfo(
     flags = VkCommandBufferUsageFlags(OneTimeSubmitBit),
