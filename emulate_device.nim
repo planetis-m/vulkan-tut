@@ -1,3 +1,4 @@
+# Compile with at least `-d:ThreadPoolSize=workgroupSizeX*workgroupSizeY*workgroupSizeZ+1`
 import threading/barrier, malebolgia
 
 type
