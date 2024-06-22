@@ -76,7 +76,7 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
         # Declare your shared variables here.
         var shared = newSeq[int32](workGroupSize.x)
 
-        var barrier = createBarrier(workGroupSize.x)
+        var barrier = createBarrier(workGroupSize.x * workGroupSize.y * workGroupSize.z)
         var master = createMaster(activeProducer = true)
         master.awaitAll:
           for z in 0 ..< workGroupSize.z:

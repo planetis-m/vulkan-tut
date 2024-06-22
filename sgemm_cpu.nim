@@ -77,7 +77,7 @@ proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
         # echo "New workgroup! id ", wgX, ", ", wgY
         var shared = (newSeq[float32](tileSize * tileSize), newSeq[float32](tileSize * tileSize))
 
-        var barrier = createBarrier(workGroupSize.x * workGroupSize.y)
+        var barrier = createBarrier(workGroupSize.x * workGroupSize.y * workGroupSize.z)
         var master = createMaster(activeProducer = true)
         master.awaitAll:
           for z in 0 ..< workGroupSize.z:
