@@ -27,7 +27,7 @@ proc wait*(m: BarrierHandle) {.inline.} =
 
 proc sgemmShader(env: GlEnvironment; barrier: BarrierHandle;
                  buffers: Locker[tuple[A, B, C: seq[float32]]];
-                 smem: ptr[tuple[sharedA, sharedB: seq[float32]]];
+                 smem: ptr tuple[sharedA, sharedB: seq[float32]];
                  alpha, beta: float32; transposeA, transposeB: bool;
                  M, K, N, tileSize: int) {.gcsafe.} =
   let localRow = env.gl_LocalInvocationID.y.int

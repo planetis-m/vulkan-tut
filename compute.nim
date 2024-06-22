@@ -7,7 +7,7 @@ const
 template toCString(arr: openarray[char]): untyped = cast[cstring](addr arr[0])
 
 proc alignUp(value, alignment: VkDeviceSize): VkDeviceSize {.inline.} =
-  (value + alignment - 1.VkDeviceSize) and not (alignment - 1.VkDeviceSize)
+  (value + (alignment - 1.VkDeviceSize)) and not (alignment - 1.VkDeviceSize)
 
 proc getComputeQueueFamilyIndex(physicalDevice: VkPhysicalDevice): uint32 =
   # Find a compute queue family

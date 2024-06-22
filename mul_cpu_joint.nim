@@ -32,8 +32,8 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     tileSizeA, tileSizeB, tileSizeRatio: int) {.gcsafe.} =
   let i = env.gl_LocalInvocationID.x.int div tileSizeB
   let j = env.gl_LocalInvocationID.x.int mod tileSizeB
-  let globalRow = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + env.gl_LocalInvocationID.x.int
-  let globalCol = env.gl_WorkGroupID.y.int * tileSizeB
+  let row = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + env.gl_LocalInvocationID.x.int
+  let col = env.gl_WorkGroupID.y.int * tileSizeB
 
   var cReg = newSeq[float32](tileSizeB)
   # for i in 0..<tileSizeB:
@@ -41,8 +41,8 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   for tileIndex in countup(0, ceilDiv(K, tileSizeRatio)):
     # Load tiles into shared memory
     unprotected buffers as b:
-      if globalCol + j < N and (tileIndex * tileSizeRatio + i) < K:
-        sharedB[i * tileSizeB + j] = b.B[(tileIndex * tileSizeRatio + i) * N + globalCol + j]
+      if col + j < N and (tileIndex * tileSizeRatio + i) < K:
+        sharedB[i * tileSizeB + j] = b.B[(tileIndex * tileSizeRatio + i) * N + col + j]
       else:
         sharedB[i * tileSizeB + j] = 0
     # Wait for both tiles to be loaded in before doing computation
@@ -51,8 +51,8 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
       # Load tile of matrix A into register
       var aReg: float32 = 0
       unprotected buffers as b:
-        if globalRow < M and (tileIndex * tileSizeRatio + i) < K:
-          aReg = b.A[globalRow * K + tileIndex * tileSizeRatio + i]
+        if row < M and (tileIndex * tileSizeRatio + i) < K:
+          aReg = b.A[row * K + tileIndex * tileSizeRatio + i]
       # Loop over and update the output elements
       for j in 0..<tileSizeB:
         cReg[j] += aReg * sharedB[i * tileSizeB + j]
@@ -61,8 +61,8 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
 
   unprotected buffers as b:
     for j in 0..<tileSizeB:
-      if globalRow < M and globalCol + j < N:
-        b.C[globalRow * N + globalCol + j] = cReg[j]
+      if row < M and col + j < N:
+        b.C[row * N + col + j] = cReg[j]
 
 proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3;
                      buffers: Locker[tuple[A, B, C: seq[float32]]]; M, K, N,

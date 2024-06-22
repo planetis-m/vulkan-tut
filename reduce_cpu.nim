@@ -1,7 +1,7 @@
 # https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
 # https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
-# `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -g`
+# `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -d:useMalloc -g`
 # ...and debug with nim-gdb or lldb
 import std/math, threading/barrier, malebolgia, malebolgia/lockers
 
@@ -30,7 +30,7 @@ proc wait*(m: BarrierHandle) {.inline.} =
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output: seq[int32]]],
-                     smem: ptr[seq[int32]], n: uint) {.gcsafe.} =
+                     smem: ptr seq[int32], n: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
   var globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
