@@ -1,4 +1,45 @@
 # Compile with at least `-d:ThreadPoolSize=workgroupSizeX*workgroupSizeY*workgroupSizeZ+1`
+
+## ## Description
+##
+## `runComputeOnCpu` is a template that simulates a GPU-like compute environment on the CPU.
+## It organizes work into workgroups and invocations, similar to how compute shaders operate
+## on GPUs.
+##
+## ## Parameters
+##
+## - `numWorkGroups: UVec3` The number of workgroups
+## - `workGroupSize: UVec3` The size of each workgroup
+## - `smem` Defines the shared memory for each workgroup.
+## - `compute` A call to a compute shader function.
+##
+## ## Compute Function Signature
+##
+## The function called in the `compute` parameter should have the following signature:
+##
+## ```nim
+## proc computeFunction(env: GlEnvironment, barrier: BarrierHandle,
+##                      buffers: Locker[YourBufferType],
+##                      shared: ptr YourSharedMemoryType,
+##                      #[ ...additional parameters ]#) {.gcsafe.}
+## ```
+##
+## ## Example
+##
+## ```nim
+## proc myComputeShader(env: GlEnvironment, barrier: BarrierHandle,
+##                      buffers: Locker[tuple[input, output: seq[float32]]],
+##                      shared: ptr seq[float32], factor: float32) {.gcsafe.} =
+##   # Computation logic here
+##
+## let numWorkGroups = uvec3(4, 4, 1)
+## let workGroupSize = uvec3(256, 1, 1)
+## var buffers = initLocker((input: newSeq[float32](4096), output: newSeq[float32](4096)))
+##
+## runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[float32](256)):
+##   myComputeShader(env, barrier.getHandle(), buffers, addr shared, 2.0f)
+## ```
+
 import threading/barrier, malebolgia
 
 type
