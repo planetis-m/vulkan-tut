@@ -8,10 +8,10 @@
 ##
 ## ## Parameters
 ##
-## - `numWorkGroups: UVec3` The number of workgroups
-## - `workGroupSize: UVec3` The size of each workgroup
-## - `smem` Defines the shared memory for each workgroup.
-## - `compute` A call to a compute shader function.
+## - `numWorkGroups: UVec3` The number of workgroups in each dimension (x, y, z).
+## - `workGroupSize: UVec3` The size of each workgroup in each dimension (x, y, z).
+## - `smem: untyped` Defines the shared memory for each workgroup.
+## - `compute: untyped` A call to a compute shader function.
 ##
 ## ## Compute Function Signature
 ##

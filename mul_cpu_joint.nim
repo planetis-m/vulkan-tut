@@ -68,7 +68,7 @@ proc main =
   var buffers = initLocker (A: A, B: B, C: newSeq[float32](M * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, smem = newSeq[float32](localSizeRatio * localSizeB)):
+  runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[float32](localSizeRatio * localSizeB)):
     multiplyShader(env, barrier.getHandle(), buffers, addr shared, M, K, N,
                    localSizeA, localSizeB, localSizeRatio)
 
