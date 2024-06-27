@@ -3,30 +3,7 @@
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
 # `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -d:useMalloc -g`
 # ...and debug with nim-gdb or lldb
-import std/math, threading/barrier, malebolgia, malebolgia/lockers
-
-type
-  UVec3 = object
-    x, y, z: uint
-
-  GlEnvironment* = object
-    gl_GlobalInvocationID*: UVec3
-    gl_WorkGroupSize*: UVec3
-    gl_WorkGroupID*: UVec3
-    gl_NumWorkGroups*: UVec3
-    gl_LocalInvocationID*: UVec3
-
-  BarrierHandle* = object
-    x: ptr Barrier
-
-proc uvec3(x, y, z: uint): UVec3 =
-  result = UVec3(x: x, y: y, z: z)
-
-proc getHandle*(b: var Barrier): BarrierHandle {.inline.} =
-  result = BarrierHandle(x: addr(b))
-
-proc wait*(m: BarrierHandle) {.inline.} =
-  wait(m.x[])
+import emulate_device, std/math, malebolgia, malebolgia/lockers
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output: seq[int32]]],
@@ -62,34 +39,6 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     unprotected buffers as b:
       b.output[env.gl_WorkGroupID.x] = smem[0]
 
-proc runComputeOnCpu(numWorkGroups, workGroupSize: UVec3,
-                     buffers: Locker[tuple[input, output: seq[int32]]], n: uint) =
-  var env: GlEnvironment
-  env.gl_NumWorkGroups = numWorkGroups
-  env.gl_WorkGroupSize = workGroupSize
-
-  for wgZ in 0 ..< numWorkGroups.z:
-    for wgY in 0 ..< numWorkGroups.y:
-      for wgX in 0 ..< numWorkGroups.x:
-        env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-        echo "New workgroup! id ", wgX
-        # Declare your shared variables here.
-        var shared = newSeq[int32](workGroupSize.x)
-
-        var barrier = createBarrier(workGroupSize.x * workGroupSize.y * workGroupSize.z)
-        var master = createMaster(activeProducer = true)
-        master.awaitAll:
-          for z in 0 ..< workGroupSize.z:
-            for y in 0 ..< workGroupSize.y:
-              for x in 0 ..< workGroupSize.x:
-                env.gl_LocalInvocationID = uvec3(x, y, z)
-                env.gl_GlobalInvocationID = uvec3(
-                  wgX * workGroupSize.x + x,
-                  wgY * workGroupSize.y + y,
-                  wgZ * workGroupSize.z + z
-                )
-                master.spawn reductionShader(env, barrier.getHandle(), buffers, addr shared, n)
-
 # Main
 const
   numElements = 256
@@ -110,7 +59,8 @@ proc main =
   var buffers = initLocker (input: inputData, output: newSeq[int32](gridSize))
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, numElements)
+  runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
+    reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements)
 
   unprotected buffers as b:
     let result = sum(b.output)

@@ -7,8 +7,6 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     buffers: Locker[tuple[A, B, C: seq[float32]]];
                     sharedB: ptr seq[float32]; M, K, N,
                     tileSizeA, tileSizeB, tileSizeRatio: int) {.gcsafe.} =
-  let i = env.gl_LocalInvocationID.x.int div tileSizeB
-  let j = env.gl_LocalInvocationID.x.int mod tileSizeB
   let row = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + env.gl_LocalInvocationID.x.int
   let col = env.gl_WorkGroupID.y.int * tileSizeB
 
@@ -17,6 +15,8 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
   #   cReg[i] = 0
   for tileIndex in countup(0, ceilDiv(K, tileSizeRatio)):
     # Load tiles into shared memory
+    let i = env.gl_LocalInvocationID.x.int div tileSizeB
+    let j = env.gl_LocalInvocationID.x.int mod tileSizeB
     unprotected buffers as b:
       if col + j < N and (tileIndex * tileSizeRatio + i) < K:
         sharedB[i * tileSizeB + j] = b.B[(tileIndex * tileSizeRatio + i) * N + col + j]

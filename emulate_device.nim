@@ -34,7 +34,7 @@
 ##
 ## let numWorkGroups = uvec3(4, 4, 1)
 ## let workGroupSize = uvec3(256, 1, 1)
-## var buffers = initLocker((input: newSeq[float32](4096), output: newSeq[float32](4096)))
+## var buffers = initLocker (input: newSeq[float32](4096), output: newSeq[float32](4096))
 ##
 ## runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[float32](256)):
 ##   myComputeShader(env, barrier.getHandle(), buffers, addr shared, 2.0f)
