@@ -101,7 +101,7 @@ proc main =
   let computeShaderModule = createShaderModule(device, shaderSPV)
   let pipelineLayout = createPipelineLayout(device, [descriptorSetLayout])
   let pipeline = createComputePipeline(device, computeShaderModule, pipelineLayout,
-                                      specializationEntries, addr(workgroupSize), dataSize)
+                                      specializationEntries, addr workgroupSize, dataSize)
 
   # Clean up shader module
   destroyShaderModule(device, computeShaderModule)

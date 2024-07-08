@@ -178,11 +178,11 @@ proc createBuffers(x: var MandelbrotGenerator) =
   # Allocate memory for both buffers
   (x.storageBuffer, x.storageBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(float32)*4*x.width*x.height),
-    VkBufferUsageFlags{VkBufferUsageFlagBits.StorageBufferBit},
+    VkBufferUsageFlags{StorageBufferBit},
     VkMemoryPropertyFlags{HostCoherentBit, HostVisibleBit})
   (x.uniformBuffer, x.uniformBufferMemory) = x.createBuffer(
     VkDeviceSize(sizeof(int32)*2),
-    VkBufferUsageFlags{VkBufferUsageFlagBits.UniformBufferBit},
+    VkBufferUsageFlags{UniformBufferBit},
     VkMemoryPropertyFlags{HostCoherentBit, HostVisibleBit})
   # Map the memory and write to the uniform buffer
   let mappedMemory = mapMemory(x.device, x.uniformBufferMemory, 0.VkDeviceSize,
@@ -198,14 +198,14 @@ proc createDescriptorSetLayout(x: var MandelbrotGenerator) =
       binding = 0,
       descriptorType = VkDescriptorType.StorageBuffer,
       descriptorCount = 1,
-      stageFlags = VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit),
+      stageFlags = VkShaderStageFlags{ComputeBit},
       pImmutableSamplers = nil
     ),
     newVkDescriptorSetLayoutBinding(
       binding = 1,
       descriptorType = VkDescriptorType.UniformBuffer,
       descriptorCount = 1,
-      stageFlags = VkShaderStageFlags(VkShaderStageFlagBits.ComputeBit),
+      stageFlags = VkShaderStageFlags{ComputeBit},
       pImmutableSamplers = nil
     )
   ]
@@ -336,7 +336,7 @@ proc createCommandBuffer(x: var MandelbrotGenerator) =
   x.commandBuffer = allocateCommandBuffers(x.device, commandBufferAllocateInfo)
   # Begin recording the command buffer
   let commandBufferBeginInfo = newVkCommandBufferBeginInfo(
-    flags = VkCommandBufferUsageFlags(OneTimeSubmitBit),
+    flags = VkCommandBufferUsageFlags{OneTimeSubmitBit},
     pInheritanceInfo = nil
   )
   beginCommandBuffer(x.commandBuffer, commandBufferBeginInfo)
@@ -389,10 +389,9 @@ when defined(vkDebug):
 
   proc setupDebugUtilsMessenger(x: var MandelbrotGenerator) =
     let severityFlags = VkDebugUtilsMessageSeverityFlagsEXT{
-      VerboseBit, InfoBit, VkDebugUtilsMessageSeverityFlagBitsEXT.WarningBit,
-      VkDebugUtilsMessageSeverityFlagBitsEXT.ErrorBit}
+      VerboseBit, InfoBit, WarningBit, ErrorBit}
     let messageTypeFlags = VkDebugUtilsMessageTypeFlagsEXT{
-      GeneralBit, VkDebugUtilsMessageTypeFlagBitsEXT.ValidationBit, PerformanceBit}
+      GeneralBit, ValidationBit, PerformanceBit}
     let createInfo = newVkDebugUtilsMessengerCreateInfoEXT(
       messageSeverity = severityFlags,
       messageType = messageTypeFlags,
