@@ -1,4 +1,4 @@
-import opengl, glut
+import opengl, glut, glhelpers
 
 proc main =
   # Create an OpenGL context and window
@@ -16,18 +16,22 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Load the compute shader
-  let shaderCode = readFile("shaders/square.comp").cstring
+  let shaderCode = readFile("shaders/square.comp.glsl").cstring
   var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
   glShaderSource(shaderModule, 1, addr shaderCode, nil)
   glCompileShader(shaderModule)
+
+  checkShaderCompilation(shaderModule)
 
   # Create the shader program
   var shaderProgram = glCreateProgram()
   glAttachShader(shaderProgram, shaderModule)
   glLinkProgram(shaderProgram)
 
+  checkProgramLinking(shaderProgram)
+
   # # Use the program
-  # glUseProgram(shaderProgram)
+  glUseProgram(shaderProgram)
 
   # Create buffers
   const NumElements = 10
@@ -54,11 +58,12 @@ proc main =
   glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outBuffer)
 
-  # Dispatch compute shader
-  glDispatchCompute(NumElements, 1, 1)
+  profile("Compute shader dispatch"):
+    # Dispatch compute shader
+    glDispatchCompute(NumElements, 1, 1)
 
-  # Synchronize and read back the results
-  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+    # Synchronize and read back the results
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
   var outBufferPtr = cast[ptr array[NumElements, int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   echo "OUTPUT: ", outBufferPtr[]

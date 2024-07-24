@@ -19,8 +19,8 @@
 ##
 ## ```nim
 ## proc computeFunction(env: GlEnvironment, barrier: BarrierHandle,
-##                      buffers: Locker[YourBufferType],
-##                      shared: ptr YourSharedMemoryType,
+##                      buffers: Locker[YourBufferType], # either Locker[T] or ptr T
+##                      shared: ptr YourSharedMemoryType, # ditto
 ##                      #[ ...additional parameters ]#) {.gcsafe.}
 ## ```
 ##
