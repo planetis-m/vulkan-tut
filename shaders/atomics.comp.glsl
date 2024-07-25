@@ -1,16 +1,13 @@
 #version 450
 layout(local_size_x = 32) in;
 
-layout(std430, binding = 0) buffer CounterBuffer {
-  int nextTask;  // Atomic counter in its own buffer
-};
-
-layout(std430, binding = 1) buffer TaskBuffer {
+layout(std430, binding = 0) buffer lay0 {
+  int nextTask;  // Atomic counter to keep track of the next task to allocate
   int numTasks;  // Total number of tasks
-  int tasks[];   // Array of tasks
+  int tasks[];   // Array of tasks (1 means task is available, 0 means taken)
 };
 
-layout(std430, binding = 2) buffer ResultBuffer {
+layout(std430, binding = 1) buffer lay1 {
   int results[];  // Array to store which invocation got which task
 };
 
