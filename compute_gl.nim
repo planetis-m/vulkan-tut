@@ -38,12 +38,9 @@ proc main =
   const BufferSize = NumElements*sizeof(int32)
 
   var inpBuffer, outBuffer: GLuint
-  glGenBuffers(1, inpBuffer.addr)
-  glGenBuffers(1, outBuffer.addr)
 
   # Bind the input buffer and allocate memory
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, inpBuffer)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  inpBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
 
   # Map the input buffer and write data
   var inpBufferPtr = cast[ptr array[NumElements, int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
@@ -51,11 +48,10 @@ proc main =
     inpBufferPtr[i] = int32(i)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inpBuffer)
-
   # Bind the output buffer and allocate memory
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, outBuffer)
-  glBufferData(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  outBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, BufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inpBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outBuffer)
 
   profile("Compute shader dispatch"):
