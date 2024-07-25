@@ -60,10 +60,10 @@ proc initResources(): MatrixMultiplication =
 
   result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, 3*sizeof(uint32), nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
-  let uniformBufferPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
-  uniformBufferPtr[0] = M.uint32
-  uniformBufferPtr[1] = K.uint32
-  uniformBufferPtr[2] = N.uint32
+  let uniformBufferPtr = cast[ptr UncheckedArray[int32]](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
+  uniformBufferPtr[0] = M.int32
+  uniformBufferPtr[1] = K.int32
+  uniformBufferPtr[2] = N.int32
   discard glUnmapBuffer(GL_UNIFORM_BUFFER)
 
 proc dispatchComputeShader(resources: MatrixMultiplication) =

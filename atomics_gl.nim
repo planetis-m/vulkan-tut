@@ -27,21 +27,25 @@ proc main =
   checkProgramLinking(shaderProgram)
 
   # Create buffers
-  const NumTasks = 100
-  const NumWorkers = 128
-  const TaskBufferSize = (2 * sizeof(int32)) + (NumTasks * sizeof(int32))
+  const NumTasks = 10000
+  const NumWorkers = 12800
+  const TaskBufferSize = sizeof(int32) + NumTasks * sizeof(int32)
   const ResultBufferSize = NumWorkers * sizeof(int32)
 
-  var taskBuffer, resultBuffer: GLuint
+  var counterBuffer, taskBuffer, resultBuffer: GLuint
+
+  counterBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, TaskBufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
+  var counterPtr = cast[ptr int32](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  counterPtr[] = 0  # Start with task 0
+  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   # Initialize task buffer (all tasks initially available)
   taskBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, TaskBufferSize.GLsizeiptr, nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, taskBuffer)
   var taskBufferPtr = cast[ptr UncheckedArray[int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
-  taskBufferPtr[0] = 0  # nextTask
-  taskBufferPtr[1] = NumTasks  # numTasks
+  taskBufferPtr[0] = NumTasks  # numTasks
   for i in 0 ..< NumTasks:
-    taskBufferPtr[i + 2] = 1  # 1 means task is available
+    taskBufferPtr[i + 1] = 1  # 1 means task is available
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   # Initialize result buffer
@@ -50,12 +54,9 @@ proc main =
   # Use the program
   glUseProgram(shaderProgram)
 
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, taskBuffer)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resultBuffer)
-
-  # Set the uniform for the number of tasks
-  let numTasksLocation = glGetUniformLocation(shaderProgram, "numTasks")
-  glUniform1i(numTasksLocation, NumTasks.GLint)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, counterBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, taskBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, resultBuffer)
 
   profile("Compute shader dispatch"):
     # Dispatch compute shader
@@ -67,12 +68,13 @@ proc main =
   # Read and print results
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resultBuffer)
   var resultBufferPtr = cast[ptr array[NumWorkers, int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  echo "Task Allocation Results:"
-  for i in 0 ..< NumWorkers:
-    echo "Worker ", i, " got task ", resultBufferPtr[i]
+  # echo "Task Allocation Results:"
+  # for i in 0 ..< NumWorkers:
+  #   echo "Worker ", i, " got task ", resultBufferPtr[i]
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
   # Clean up
+  glDeleteBuffers(1, counterBuffer.addr)
   glDeleteBuffers(1, taskBuffer.addr)
   glDeleteBuffers(1, resultBuffer.addr)
   glDeleteProgram(shaderProgram)
