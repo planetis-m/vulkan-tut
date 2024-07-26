@@ -1,4 +1,6 @@
 import opengl, glut, glhelpers
+when true:
+  import glshaderc
 
 proc main =
   # Create an OpenGL context and window
@@ -16,10 +18,13 @@ proc main =
   echo "OpenGL Version: ", versionString
 
   # Load the compute shader
-  let shaderCode = readFile("shaders/square.comp.glsl").cstring
-  var shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-  glShaderSource(shaderModule, 1, addr shaderCode, nil)
-  glCompileShader(shaderModule)
+  let shaderCode = readFile("shaders/square.comp.glsl")
+  when true:
+    let shaderModule = loadShader(GL_COMPUTE_SHADER, shaderCode, "square.comp", [])
+  else:
+    let shaderModule = glCreateShader(GL_COMPUTE_SHADER)
+    glShaderSource(shaderModule, 1, shaderCode.cstring, nil)
+    glCompileShader(shaderModule)
 
   checkShaderCompilation(shaderModule)
 

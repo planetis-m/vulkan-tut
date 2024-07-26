@@ -1,9 +1,7 @@
 import shaderc, opengl, glerrors, glhelpers
 
-export ShadercShaderKind
-
 proc createShaderModule*(program: GLuint, source: string, kind: ShadercShaderKind,
-    filename: string = "", optimize = false) =
+                         filename: string = "", optimize = false) =
   let compiler = shadercCompilerInitialize()
   let options = shadercCompileOptionsInitialize()
   try:
@@ -44,7 +42,7 @@ proc loadShader*[N: static int](shaderType: GLenum, source, filename: string,
                                 constants: array[N, SpecializationConstant]): GLuint =
   result = glCreateShader(shaderType)
   if result != 0.GLUint:
-    createShaderModule(source, glEnumToShadercShaderKind(shaderType), filename)
+    createShaderModule(result, source, glEnumToShadercShaderKind(shaderType), filename)
     when N > 0:
       var indices: array[N, GLuint]
       var values: array[N, GLuint]

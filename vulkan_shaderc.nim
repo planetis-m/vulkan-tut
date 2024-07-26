@@ -15,7 +15,7 @@ proc createShaderModule*(device: VkDevice, source: string,
       kind, filename, "main", options)
     try:
       if module.getCompilationStatus() != Success:
-        raise newException(ValueError, "Error compiling module - " & $module.getErrorMessage())
+        raise newException(ValueError, "Error compiling module: " & $module.getErrorMessage())
       let shaderModuleCreateInfo = newVkShaderModuleCreateInfo(
         code = toOpenArray(module.getBytes(), 0, module.getLength().int - 1)
       )
