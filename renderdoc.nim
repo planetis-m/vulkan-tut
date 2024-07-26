@@ -2,7 +2,7 @@ import std/dynlib, vulkan, renderdoc_app
 
 when defined(android):
   const rDocDLL = "libVkLayer_GLES_RenderDoc.so"
-when defined(linux):
+elif defined(linux):
   const rDocDLL = "librenderdoc.so"
 elif defined(windows):
   const rDocDLL = "renderdoc.dll"
