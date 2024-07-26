@@ -3,7 +3,7 @@ import vulkan, vulkan_wrapper, shaderc
 export ShadercShaderKind
 
 proc createShaderModule*(device: VkDevice, source: string,
-    kind: ShadercShaderKind, filename: string, optimize = false,
+    kind: ShadercShaderKind, filename: string = "", optimize = false,
     apiVersion = vkApiVersion1_3.uint32): VkShaderModule =
   let compiler = shadercCompilerInitialize()
   let options = shadercCompileOptionsInitialize()

@@ -1,4 +1,4 @@
-import vulkan, vulkan_wrapper, vulkan_functions,
+import vulkan, vulkan_wrapper, vulkan_functions, vulkan_shaderc,
   std/[os, math], pixie/fileformats/qoi, chroma, renderdoc
 
 type
@@ -33,7 +33,12 @@ proc main =
     let debugUtilsMessenger = setupDebugUtilsMessenger(instance)
   let physicalDevice = findPhysicalDevice(instance)
   let queueFamilyIndex = getComputeQueueFamilyIndex(physicalDevice)
-  let device = createDevice(physicalDevice, queueFamilyIndex, layers, [], [])
+
+  # If execution mode LocalSizeId is used, maintenance4 must be enabled
+  let maintenance4Features = newVkPhysicalDeviceMaintenance4Features(
+      maintenance4 = true.VkBool32)
+  let device = createDevice(physicalDevice, queueFamilyIndex, layers,
+      [], [], addr maintenance4Features)
 
   let storageSize = VkDeviceSize(sizeof(float32) * 4 * width * height)
   let uniformSize = VkDeviceSize(sizeof(int32) * 2)
@@ -96,9 +101,9 @@ proc main =
   ]
   let workgroupSize = WorkgroupSize(x: 32, y: 32)
   let dataSize = sizeof(WorkgroupSize).uint
-  let shaderSPV = readFile("build/shaders/mandelbrot.comp.spv")
+  let shaderSource = readFile("shaders/mandelbrot.comp.glsl")
 
-  let computeShaderModule = createShaderModule(device, shaderSPV)
+  let computeShaderModule = createShaderModule(device, shaderSource, ComputeShader)
   let pipelineLayout = createPipelineLayout(device, [descriptorSetLayout])
   let pipeline = createComputePipeline(device, computeShaderModule, pipelineLayout,
                                       specializationEntries, addr workgroupSize, dataSize)
