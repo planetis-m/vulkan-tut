@@ -1,4 +1,6 @@
-import vulkan, vulkan_wrapper, vulkan_functions, renderdoc, std/sequtils
+import
+  vulkan, vulkan_wrapper, vulkan_functions, vulkan_shaderc,
+  renderdoc, std/sequtils
 
 proc main() =
   let layers = getLayers()
@@ -15,8 +17,8 @@ proc main() =
   let device = createDevice(physicalDevice, queueFamilyIndex, layers, [], [])
   let queue = getDeviceQueue(device, queueFamilyIndex, 0)
 
-  let shaderSPV = readFile("build/shaders/hello_world.comp.spv")
-  let shaderModule = createShaderModule(device, shaderSPV)
+  let shaderSource = readFile("shaders/hello_world.comp.glsl")
+  let shaderModule = createShaderModule(device, shaderSource, ComputeShader, "hello_world.comp")
   let pipelineLayout = createPipelineLayout(device, descriptorSetLayouts = [])
   let pipeline = createComputePipeline(device, shaderModule, pipelineLayout, specializationEntries = [], nil, 0)
   # Create command pool

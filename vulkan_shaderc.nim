@@ -1,11 +1,14 @@
 import vulkan, vulkan_wrapper, shaderc
 
+export ShadercShaderKind
+
 proc createShaderModule*(device: VkDevice, source: string,
-    kind: ShadercShaderKind, filename: string, optimize: bool): VkShaderModule =
+    kind: ShadercShaderKind, filename: string, optimize = false,
+    apiVersion = vkApiVersion1_3.uint32): VkShaderModule =
   let compiler = shadercCompilerInitialize()
   let options = shadercCompileOptionsInitialize()
   try:
-    setTargetEnv(options, Opengl, 0)
+    setTargetEnv(options, Vulkan, apiVersion)
     if optimize:
       setOptimizationLevel(options, Size)
     let module = compileIntoSpv(compiler, source.cstring, source.len.csize_t,
