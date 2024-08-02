@@ -1,12 +1,11 @@
 # https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
-import opengl, glut, glerrors, glhelpers, std/[strformat, times]
+import opengl, glut, glerrors, glhelpers, glshaderc, std/[strformat, times]
 
 const
   WorkGroupSize = 256
   NumElements = 1048576
   ElementsPerThread = 1024
   NumWorkGroups = NumElements div (WorkGroupSize * 2 * ElementsPerThread)
-  SpirvBinary = staticRead("build/shaders/reduce.comp.spv")
 
 type
   Reduction = object
@@ -34,16 +33,17 @@ proc initOpenGLContext() =
 
 proc initResources(): Reduction =
   # Create and compile the compute shader
-  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
+  let shaderCode = readFile("shaders/reduce.comp.glsl")
+  result.program = createComputeProgram(shaderCode, "reduce.comp", {0.GLuint: WorkGroupSize.GLuint})
   # Input buffer
-  result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
+  result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(int32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
-  let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  let inputDataPtr = cast[ptr UncheckedArray[int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
     inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
-  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
+  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(int32), nil, GL_STATIC_DRAW)
   # Uniform buffer
   result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), nil, GL_DYNAMIC_DRAW)
   glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
@@ -64,11 +64,11 @@ proc dispatchComputeShader(resources: Reduction) =
     # Ensure all work is done
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-proc readResults(resources: Reduction): float32 =
+proc readResults(resources: Reduction): int32 =
   # Read back the results
   result = 0
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.outputBuffer)
-  let outputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+  let outputDataPtr = cast[ptr UncheckedArray[int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
   for i in 0..<NumWorkGroups:
     result += outputDataPtr[i]
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)

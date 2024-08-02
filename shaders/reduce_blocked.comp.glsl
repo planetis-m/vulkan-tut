@@ -10,24 +10,21 @@ layout(binding = 0) buffer InputBuffer {
 };
 
 layout(binding = 1) buffer OutputBuffer {
-  int outputData;
+  int outputData[];
 };
 
 layout(set = 0, binding = 2) uniform UniformBlock {
-  uint n;
+  uint coerseFactor;
 };
 
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
-  uint globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx;
-  uint gridSize = localSize * 2 * gl_NumWorkGroups.x;
+  uint globalIdx = gl_WorkGroupID.x * localSize * 2 * coerseFactor + localIdx;
 
   int sum = 0;
-  while (globalIdx < n) {
-    sum += inputData[globalIdx] + inputData[globalIdx + localSize];
-    inputData[globalIdx] = sum;
-    globalIdx += gridSize;
+  for (uint tile = 1; tile < coerseFactor * 2; tile++) {
+    sum += inputData[globalIdx + tile * localSize];
   }
   sharedData[localIdx] = sum;
   barrier();
@@ -66,6 +63,6 @@ void main() {
   }
 
   if (localIdx == 0) {
-    atomicAdd(outputData, sharedData[0]);
+    outputData[gl_WorkGroupID.x] = sharedData[0];
   }
 }
