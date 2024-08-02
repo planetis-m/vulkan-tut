@@ -15,10 +15,10 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   unprotected buffers as b:
     var sum = b.input[globalIdx]
-  for tile in 1'u ..< 2 * coerseFactor:
+  for tile in 1 ..< 2 * coerseFactor:
     # echo "ThreadId ", localIdx, " index: ", globalIdx + tile * localSize
     unprotected buffers as b:
-      sum = sum + b.input[globalIdx + tile * localSize]
+      sum = sum + b.input[globalIdx + tile.uint * localSize]
   smem[localIdx] = sum
 
   # unprotected buffers as b:

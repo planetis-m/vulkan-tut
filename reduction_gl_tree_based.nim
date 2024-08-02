@@ -1,9 +1,10 @@
 import opengl, glut, glhelpers, glshaderc, std/[strformat, times]
 
 const
-  WorkGroupSize = 256
-  NumElements = 1048576
-  NumWorkGroups = NumElements div WorkGroupSize
+  WorkGroupSize = 16
+  NumElements = 65536
+  ElementsPerThread = 1024
+  NumWorkGroups = NumElements div (WorkGroupSize * 2 * ElementsPerThread)
 
 type
   Reduction = object
