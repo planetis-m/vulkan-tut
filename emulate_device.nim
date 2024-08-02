@@ -39,12 +39,22 @@
 ## runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[float32](256)):
 ##   myComputeShader(env, barrier.getHandle(), buffers, addr shared, 2.0f)
 ## ```
+##
+## ## CUDA to GLSL Translation Table
+##
+## | CUDA Concept | GLSL Equivalent | Description |
+## |--------------|-----------------|-------------|
+## | `blockDim` | `gl_WorkGroupSize` | The size of a thread block (CUDA) or work group (GLSL) |
+## | `gridDim` | `gl_NumWorkGroups` | The size of the grid (CUDA) or the number of work groups (GLSL) |
+## | `blockIdx` | `gl_WorkGroupID` | The index of the current block (CUDA) or work group (GLSL) |
+## | `threadIdx` | `gl_LocalInvocationID` | The index of the current thread within its block (CUDA) or work group (GLSL) |
+## | `blockIdx * blockDim + threadIdx` | `gl_GlobalInvocationID` | The global index of the current thread (CUDA) or invocation (GLSL) |
 
 import threading/barrier, malebolgia
 
 type
   UVec3* = object
-    x, y, z: uint
+    x, y, z: uint = 1
 
   GlEnvironment* = object
     gl_GlobalInvocationID*: UVec3
