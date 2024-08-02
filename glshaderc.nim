@@ -53,3 +53,16 @@ proc loadShader*[N: static int](shaderType: GLenum, source, filename: string,
     else:
       glSpecializeShader(result, "main", 0, nil, nil)
     checkShaderCompilation(result)
+
+proc createComputeProgram*[N: static int](source, filename: string,
+                                          constants: array[N, SpecializationConstant]): GLuint =
+  let module = loadShader(GL_COMPUTE_SHADER, source, filename, constants)
+  if module != 0.GLUint:
+    try:
+      result = glCreateProgram()
+      if result != 0.GLUint:
+        glAttachShader(result, module)
+        glLinkProgram(result)
+        checkProgramLinking(result)
+    finally:
+      glDeleteShader(module)

@@ -23,7 +23,7 @@ proc main =
     let shaderModule = loadShader(GL_COMPUTE_SHADER, shaderCode, "square.comp", [])
   else:
     let shaderModule = glCreateShader(GL_COMPUTE_SHADER)
-    glShaderSource(shaderModule, 1, shaderCode.cstring, nil)
+    glShaderSource(shaderModule, 1, addr shaderCode.cstring, nil)
     glCompileShader(shaderModule)
 
   checkShaderCompilation(shaderModule)

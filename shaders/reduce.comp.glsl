@@ -3,14 +3,14 @@
 layout(local_size_x_id = 0) in;
 
 layout(constant_id = 0) const uint SHARED_SIZE = 32;
-shared float sharedData[SHARED_SIZE];
+shared int sharedData[SHARED_SIZE];
 
 layout(binding = 0) buffer InputBuffer {
-  float inputData[];
+  int inputData[];
 };
 
 layout(binding = 1) buffer OutputBuffer {
-  float outputData[];
+  int outputData[];
 };
 
 layout(set = 0, binding = 2) uniform UniformBlock {
@@ -23,7 +23,7 @@ void main() {
   uint globalIdx = gl_WorkGroupID.x * localSize * 2 + localIdx;
   uint gridSize = localSize * 2 * gl_NumWorkGroups.x;
 
-  float sum = 0;
+  int sum = 0;
   while (globalIdx < n) {
     sum += inputData[globalIdx] + inputData[globalIdx + localSize];
     inputData[globalIdx] = sum;

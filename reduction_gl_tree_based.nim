@@ -1,10 +1,9 @@
-import opengl, glut, glhelpers, std/[strformat, times]
+import opengl, glut, glhelpers, glshaderc, std/[strformat, times]
 
 const
   WorkGroupSize = 256
   NumElements = 1048576
   NumWorkGroups = NumElements div WorkGroupSize
-  SpirvBinary = staticRead("build/shaders/reduce.comp.spv")
 
 type
   Reduction = object
@@ -33,18 +32,19 @@ proc initOpenGLContext() =
 
 proc initResources(): Reduction =
   # Create and compile the compute shader
-  result.program = createComputeProgram(SpirvBinary, {0.GLuint: WorkGroupSize.GLuint})
+  let shaderCode = readFile("shaders/reduce.comp.glsl")
+  result.program = createComputeProgram(shaderCode, "reduce.comp", {0.GLuint: WorkGroupSize.GLuint})
   # Input buffer
-  result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(float32), nil, GL_STATIC_DRAW)
+  result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(int32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)
-  let inputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  let inputDataPtr = cast[ptr UncheckedArray[int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
   for i in 0..<NumElements:
     inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
-  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(float32), nil, GL_STATIC_DRAW)
+  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(int32), nil, GL_STATIC_DRAW)
   # Final result buffer
-  result.resultBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(float32), nil, GL_STATIC_DRAW)
+  result.resultBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(int32), nil, GL_STATIC_DRAW)
   result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), nil, GL_DYNAMIC_DRAW)
 
 proc performFirstReduction(resources: Reduction) =
@@ -79,10 +79,10 @@ proc performFinalReduction(resources: Reduction) =
     # Ensure all work is done
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
-proc readResult(resources: Reduction): float32 =
+proc readResult(resources: Reduction): int32 =
   # Read back the result
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.resultBuffer)
-  glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float32), addr result)
+  glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(int32), addr result)
 
 proc main() =
   var resources: Reduction
