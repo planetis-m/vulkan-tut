@@ -7,15 +7,15 @@
 import emulate_device, std/math, malebolgia, malebolgia/lockers
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
-                     buffers: Locker[tuple[input, output: seq[int32]]],
-                     smem: ptr seq[int32], n: uint) {.gcsafe.} =
+                     buffers: Locker[tuple[input, output: seq[int]]],
+                     smem: ptr seq[int], n: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
   var globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
 
   let gridSize = localSize * 2 * env.gl_NumWorkGroups.x
 
-  var sum: int32 = 0
+  var sum: int = 0
   while globalIdx < n:
     # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     unprotected buffers as b:
@@ -35,6 +35,13 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     wait barrier # was memoryBarrierShared
     stride = stride div 2
 
+  # # Final reduction within each subgroup
+  # if localIdx < 2:
+  #   smem[localIdx] += smem[localIdx + 2]
+  #   fence()
+  #   smem[localIdx] += smem[localIdx + 1]
+  #   fence()
+
   if localIdx == 0:
     unprotected buffers as b:
       b.output[env.gl_WorkGroupID.x] = smem[0]
@@ -52,14 +59,14 @@ proc main =
   let workGroupSize = uvec3(localSize, 1, 1)
 
   # Fill the input buffer
-  var inputData = newSeq[int32](numElements)
+  var inputData = newSeq[int](numElements)
   for i in 0..<numElements:
-    inputData[i] = int32(i)
+    inputData[i] = int(i)
 
-  var buffers = initLocker (input: inputData, output: newSeq[int32](gridSize))
+  var buffers = initLocker (input: inputData, output: newSeq[int](gridSize))
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
+  runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int](workGroupSize.x)):
     reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements)
 
   unprotected buffers as b:
