@@ -1,4 +1,4 @@
-#version 460
+#version 450
 
 layout(local_size_x_id = 0) in;
 
@@ -26,7 +26,6 @@ void main() {
   int sum = 0;
   while (globalIdx < n) {
     sum += inputData[globalIdx] + inputData[globalIdx + localSize];
-    inputData[globalIdx] = sum;
     globalIdx += gridSize;
   }
   sharedData[localIdx] = sum;
