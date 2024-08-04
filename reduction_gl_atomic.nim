@@ -57,7 +57,7 @@ proc dispatchComputeShader(resources: Reduction) =
   # Bind the shader storage buffers
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
-  glBindBufferBase(GL_UNIFORM_BUFFER, 1, resources.uniformBuffer)
+  glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
   profile("Compute shader dispatch"):
     # Dispatch the compute shader
     glDispatchCompute(NumWorkGroups, 1, 1)

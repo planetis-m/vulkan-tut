@@ -11,9 +11,8 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      smem: ptr seq[int32], n: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
-  var globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
-
   let gridSize = localSize * 2 * env.gl_NumWorkGroups.x
+  var globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
 
   var sum: int32 = 0
   while globalIdx < n:
