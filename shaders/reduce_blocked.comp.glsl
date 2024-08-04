@@ -1,4 +1,4 @@
-#version 460
+#version 450
 
 layout(local_size_x_id = 0) in;
 
@@ -22,7 +22,7 @@ void main() {
   uint localSize = gl_WorkGroupSize.x;
   uint globalIdx = gl_WorkGroupID.x * localSize * 2 * coerseFactor + localIdx;
 
-  int sum = 0;
+  int sum = inputData[globalIdx];
   for (uint tile = 1; tile < coerseFactor * 2; tile++) {
     sum += inputData[globalIdx + tile * localSize];
   }
