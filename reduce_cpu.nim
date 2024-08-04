@@ -35,10 +35,11 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     wait barrier # was memoryBarrierShared
     stride = stride div 2
 
-  # Final reduction within each subgroup
+  # # Final reduction within each subgroup
   # if localIdx < 2:
   #   smem[localIdx] += smem[localIdx + 2]
   #   fence()
+  # wait barrier # on GPU threads within a subgroup execute in lock-step
   if localIdx < 1:
     smem[localIdx] += smem[localIdx + 1]
     fence()
