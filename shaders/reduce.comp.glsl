@@ -44,33 +44,21 @@ void main() {
     sum += sharedData[localIdx + 64];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
-  }
-  if (localIdx < 32) {
     sum += sharedData[localIdx + 32];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
-  }
-  if (localIdx < 16) {
     sum += sharedData[localIdx + 16];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
-  }
-  if (localIdx < 8) {
     sum += sharedData[localIdx + 8];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
-  }
-  if (localIdx < 4) {
     sum += sharedData[localIdx + 4];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
-  }
-  if (localIdx < 2) {
     sum += sharedData[localIdx + 2];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
-  }
-  if (localIdx < 1) {
     sum += sharedData[localIdx + 1];
     sharedData[localIdx] = sum;
     memoryBarrierShared();
