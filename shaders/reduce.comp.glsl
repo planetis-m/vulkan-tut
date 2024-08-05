@@ -3,8 +3,9 @@
 layout(local_size_x_id = 0) in;
 
 layout(constant_id = 0) const uint SHARED_SIZE = 32;
-layout(constant_id = 1) const uint WARP_SIZE = 32;
-
+#ifndef WARP_SIZE
+#define WARP_SIZE 32
+#endif
 shared int sharedData[SHARED_SIZE];
 
 layout(binding = 0) buffer InputBuffer {
@@ -20,12 +21,14 @@ layout(set = 0, binding = 2) uniform UniformBlock {
 };
 
 void warpReduce(uint localIdx) {
-  if (WARP_SIZE == 64) {
-    sharedData[localIdx] += sharedData[localIdx + 64];
-    memoryBarrierShared();
-  }
+  #if WARP_SIZE >= 64
+  sharedData[localIdx] += sharedData[localIdx + 64];
+  memoryBarrierShared();
+  #endif
+  #if WARP_SIZE >= 32
   sharedData[localIdx] += sharedData[localIdx + 32];
   memoryBarrierShared();
+  #endif
   sharedData[localIdx] += sharedData[localIdx + 16];
   memoryBarrierShared();
   sharedData[localIdx] += sharedData[localIdx + 8];
