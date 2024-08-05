@@ -2,9 +2,9 @@ import shaderc, opengl, glerrors, glhelpers
 
 const WarpSize {.intdefine.} = 64
 
-proc addMacroDefinition*(options: ShadercCompileOptionsT; name: string) {.inline.} =
+proc addMacroDefinition(options: ShadercCompileOptionsT; name: string) {.inline.} =
   addMacroDefinition(options, name.cstring, name.len.csize_t, nil, 0)
-proc addMacroDefinition*(options: ShadercCompileOptionsT; name, value: string) {.inline.} =
+proc addMacroDefinition(options: ShadercCompileOptionsT; name, value: string) {.inline.} =
   addMacroDefinition(options, name.cstring, name.len.csize_t, value.cstring, value.len.csize_t)
 
 proc createShaderModule*(program: GLuint, source: string, kind: ShadercShaderKind,

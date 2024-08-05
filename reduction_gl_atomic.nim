@@ -43,13 +43,11 @@ proc initResources(): Reduction =
     inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
-  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(int32), nil, GL_STATIC_DRAW)
+  var zero: uint32 = 0
+  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(int32), addr zero, GL_STATIC_DRAW)
   # Uniform buffer
-  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), nil, GL_DYNAMIC_DRAW)
-  glBindBuffer(GL_UNIFORM_BUFFER, result.uniformBuffer)
-  let uniformBufferPtr = cast[ptr uint32](glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY))
-  uniformBufferPtr[] = NumElements
-  discard glUnmapBuffer(GL_UNIFORM_BUFFER)
+  var uniform: uint32 = NumElements
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), addr uniform, GL_DYNAMIC_DRAW)
 
 proc dispatchComputeShader(resources: Reduction) =
   # Use the program
