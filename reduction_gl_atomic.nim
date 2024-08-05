@@ -1,6 +1,6 @@
 # https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
 import opengl, glut, glerrors, glhelpers, glshaderc, std/[strformat, times]
-# Doesn't work. No idea why
+
 const
   WorkGroupSize = 256 # Shader doesn't work with workgroup <= 64
   NumElements = 1048576
