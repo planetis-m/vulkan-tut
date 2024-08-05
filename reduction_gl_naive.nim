@@ -34,7 +34,8 @@ proc initOpenGLContext() =
 proc initResources(): Reduction =
   # Create and compile the compute shader
   let shaderCode = readFile("shaders/reduce.comp.glsl")
-  result.program = createComputeProgram(shaderCode, "reduce.comp", {0.GLuint: WorkGroupSize.GLuint})
+  result.program = createComputeProgram(shaderCode, "reduce.comp",
+      {0.GLuint: WorkGroupSize.GLuint, 1.GLuint: 64.GLuint})
   # Input buffer
   result.inputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumElements*sizeof(int32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.inputBuffer)

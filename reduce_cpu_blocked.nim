@@ -1,6 +1,4 @@
-# https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
-# https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
-# https://moderngpu.github.io/scan.html
+# From Programming Massively Parallel Processors 4th edition (the blocked part)
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
 # `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -d:useMalloc -g`
 # ...and debug with nim-gdb or lldb

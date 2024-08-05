@@ -3,6 +3,8 @@
 layout(local_size_x_id = 0) in;
 
 layout(constant_id = 0) const uint SHARED_SIZE = 32;
+layout(constant_id = 1) const uint WARP_SIZE = 32;
+
 shared int sharedData[SHARED_SIZE];
 
 layout(binding = 0) buffer InputBuffer {
@@ -16,6 +18,25 @@ layout(binding = 1) buffer OutputBuffer {
 layout(set = 0, binding = 2) uniform UniformBlock {
   uint n;
 };
+
+void warpReduce(uint localIdx) {
+  if (WARP_SIZE == 64) {
+    sharedData[localIdx] += sharedData[localIdx + 64];
+    memoryBarrierShared();
+  }
+  sharedData[localIdx] += sharedData[localIdx + 32];
+  memoryBarrierShared();
+  sharedData[localIdx] += sharedData[localIdx + 16];
+  memoryBarrierShared();
+  sharedData[localIdx] += sharedData[localIdx + 8];
+  memoryBarrierShared();
+  sharedData[localIdx] += sharedData[localIdx + 4];
+  memoryBarrierShared();
+  sharedData[localIdx] += sharedData[localIdx + 2];
+  memoryBarrierShared();
+  sharedData[localIdx] += sharedData[localIdx + 1];
+  memoryBarrierShared();
+}
 
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
@@ -31,37 +52,16 @@ void main() {
   sharedData[localIdx] = sum;
   barrier();
 
-  for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > WARP_SIZE; stride >>= 1) {
     if (localIdx < stride) {
-      sum += sharedData[localIdx + stride];
-      sharedData[localIdx] = sum;
+      sharedData[localIdx] += sharedData[localIdx + stride];
     }
-    memoryBarrierShared();
+    barrier();
   }
 
   // Final reduction within each subgroup
-  if (localIdx < 64) {
-    sum += sharedData[localIdx + 64];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
-    sum += sharedData[localIdx + 32];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
-    sum += sharedData[localIdx + 16];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
-    sum += sharedData[localIdx + 8];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
-    sum += sharedData[localIdx + 4];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
-    sum += sharedData[localIdx + 2];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
-    sum += sharedData[localIdx + 1];
-    sharedData[localIdx] = sum;
-    memoryBarrierShared();
+  if (localIdx < WARP_SIZE) {
+    warpReduce(localIdx);
   }
 
   if (localIdx == 0) {
