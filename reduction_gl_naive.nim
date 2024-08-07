@@ -47,7 +47,7 @@ proc initResources(): Reduction =
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(int32), nil, GL_STATIC_DRAW)
   # Uniform buffer
   var uniform: uint32 = NumElements
-  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uint32), addr uniform, GL_DYNAMIC_DRAW)
+  result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uniform), addr uniform, GL_DYNAMIC_DRAW)
 
 proc dispatchComputeShader(resources: Reduction) =
   # Use the program

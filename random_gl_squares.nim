@@ -109,7 +109,7 @@ proc main =
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
   profile("Map output buffer"):
-    var bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
+    let bufferPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
 
   var rs: RunningStat
   for i in 0 ..< NumElements:
