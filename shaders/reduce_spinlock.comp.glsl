@@ -21,7 +21,6 @@ layout(set = 0, binding = 2) uniform UniformBlock {
 void acquire() {
   while (true) {
     if (atomicCompSwap(lock, 0, 1) == 0) {
-//       memoryBarrier();
       return;
     } else {
       while (atomicOr(lock, 0) != 0) { }
@@ -30,7 +29,6 @@ void acquire() {
 }
 
 void release() {
-//   memoryBarrier();
   atomicExchange(lock, 0);
 }
 
@@ -81,6 +79,16 @@ void main() {
     memoryBarrierShared();
   }
 
+ /*
+  * The use of a spinlock in this compute shader is safe and will not lead
+  * to potential deadlocks or starvation issues that can arise due to the
+  * lack of forward-progress guarantee's due to GPU architecture.
+  *
+  * In this case, only one thread per workgroup attempts to acquire the lock,
+  * and we assume that the workgroup size exceeds the subgroup size. If this
+  * assumption were violated, it could cause problems with threads in a subgroup
+  * running in lockstep.
+  */
   if (localIdx == 0) {
     acquire();
     outputData += sharedData[0];
