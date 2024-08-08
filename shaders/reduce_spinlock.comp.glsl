@@ -81,13 +81,13 @@ void main() {
 
  /*
   * The use of a spinlock in this compute shader is safe and will not lead
-  * to potential deadlocks or starvation issues that can arise due to the
-  * lack of forward-progress guarantee's due to GPU architecture.
+  * to potential deadlocks or starvation issues that can arise from the
+  * lack of forward-progress guarantees due to the GPU's architecture.
   *
   * In this case, only one thread per workgroup attempts to acquire the lock,
   * and we assume that the workgroup size exceeds the subgroup size. If this
-  * assumption were violated, it could cause problems with threads in a subgroup
-  * running in lockstep.
+  * assumption was violated, it could cause problems with thread divergence.
+  * https://stackoverflow.com/a/58064256
   */
   if (localIdx == 0) {
     acquire();
