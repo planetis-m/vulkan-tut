@@ -34,7 +34,7 @@ void main() {
       sum += sharedData[localIdx + stride];
       sharedData[localIdx] = sum;
     }
-    memoryBarrierShared();
+    barrier();
   }
 
   // Final reduction within each subgroup

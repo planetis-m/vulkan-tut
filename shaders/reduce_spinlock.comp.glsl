@@ -21,6 +21,7 @@ layout(set = 0, binding = 2) uniform UniformBlock {
 void acquire() {
   while (true) {
     if (atomicCompSwap(lock, 0, 1) == 0) {
+//       memoryBarrier();
       return;
     } else {
       while (atomicOr(lock, 0) != 0) { }
@@ -29,6 +30,7 @@ void acquire() {
 }
 
 void release() {
+//   memoryBarrier();
   atomicExchange(lock, 0);
 }
 
@@ -51,7 +53,7 @@ void main() {
       sum += sharedData[localIdx + stride];
       sharedData[localIdx] = sum;
     }
-    memoryBarrierShared();
+    barrier();
   }
 
   // Final reduction within each subgroup
