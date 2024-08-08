@@ -4,8 +4,8 @@ import opengl, glut, glerrors, glhelpers, glshaderc, std/[strformat, times]
 const
   WorkGroupSize = 256 # Shader doesn't work with workgroup <= 64
   NumElements = 1048576
-  ElementsPerThread = 1
-  NumWorkGroups = NumElements div (WorkGroupSize * 2 * ElementsPerThread)
+  CoerseFactor = 1
+  NumWorkGroups = NumElements div (WorkGroupSize * 2 * CoerseFactor)
 
 type
   Reduction = object
@@ -43,7 +43,7 @@ proc initResources(): Reduction =
     inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
-  var zeros: (int64, uint32) = (0, 0)
+  var zeros: (int32, uint32) = (0, 0)
   result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(zeros), addr zeros, GL_STATIC_DRAW)
   # Uniform buffer
   var uniform: uint32 = NumElements

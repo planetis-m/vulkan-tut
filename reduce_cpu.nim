@@ -50,9 +50,9 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 # Main
 const
   numElements = 256
-  elementsPerThread = 4
+  coerseFactor = 4
   localSize = 4 # workgroupSize
-  gridSize = numElements div (localSize * 2 * elementsPerThread) # numWorkGroups
+  gridSize = numElements div (localSize * 2 * coerseFactor) # numWorkGroups
 
 proc main =
   # Set the number of work groups and the size of each work group

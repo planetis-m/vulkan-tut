@@ -38,9 +38,9 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 # Main
 const
   numElements = 256
-  elementsPerThread = 4
+  coerseFactor = 4
   localSize = 4 # workgroupSize
-  gridSize = numElements div (localSize * 2 * elementsPerThread) # numWorkGroups
+  gridSize = numElements div (localSize * 2 * coerseFactor) # numWorkGroups
 
 proc main =
   # Set the number of work groups and the size of each work group
@@ -56,7 +56,7 @@ proc main =
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
-    reductionShader(env, barrier.getHandle(), buffers, addr shared, elementsPerThread)
+    reductionShader(env, barrier.getHandle(), buffers, addr shared, CoerseFactor)
 
   unprotected buffers as b:
     let result = sum(b.output)

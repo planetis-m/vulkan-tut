@@ -1,5 +1,4 @@
 #version 450
-#extension GL_ARB_gpu_shader_int64 : require
 
 layout(local_size_x_id = 0) in;
 
@@ -11,7 +10,7 @@ layout(std430, binding = 0) buffer InputBuffer {
 };
 
 layout(std430, binding = 1) buffer OutputBuffer {
-  int64_t outputData;
+  int outputData;
   uint lock;
 };
 
@@ -22,7 +21,6 @@ layout(set = 0, binding = 2) uniform UniformBlock {
 void acquire() {
   while (true) {
     if (atomicCompSwap(lock, 0, 1) == 0) {
-//       memoryBarrier();
       return;
     } else {
       while (atomicOr(lock, 0) != 0) { }
@@ -31,7 +29,6 @@ void acquire() {
 }
 
 void release() {
-//   memoryBarrier();
   atomicExchange(lock, 0);
 }
 
