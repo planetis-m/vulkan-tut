@@ -18,20 +18,6 @@ layout(set = 0, binding = 2) uniform UniformBlock {
   uint n;
 };
 
-void acquire() {
-  while (true) {
-    if (atomicCompSwap(lock, 0, 1) == 0) {
-      return;
-    } else {
-      while (atomicOr(lock, 0) != 0) { }
-    }
-  }
-}
-
-void release() {
-  atomicExchange(lock, 0);
-}
-
 void main() {
   uint localIdx = gl_LocalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x;
@@ -90,8 +76,12 @@ void main() {
   * https://stackoverflow.com/a/58064256
   */
   if (localIdx == 0) {
-    acquire();
-    outputData += sharedData[0];
-    release();
+    while (true) {
+      if (atomicCompSwap(lock, 0, 1) == 0) {
+        outputData += sharedData[0];
+        atomicExchange(lock, 0);
+        break;
+      }
+    }
   }
 }
