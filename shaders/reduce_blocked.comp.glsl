@@ -27,6 +27,7 @@ void main() {
     sum += inputData[globalIdx + tile * localSize];
   }
   sharedData[localIdx] = sum;
+  memoryBarrierShared();
   barrier();
 
   for (uint stride = localSize / 2; stride > 64; stride >>= 1) {
@@ -34,6 +35,7 @@ void main() {
       sum += sharedData[localIdx + stride];
       sharedData[localIdx] = sum;
     }
+    memoryBarrierShared();
     barrier();
   }
 

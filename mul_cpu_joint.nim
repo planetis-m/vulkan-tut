@@ -1,6 +1,7 @@
 # Compile with at least `-d:ThreadPoolSize=workgroupSizeX*workgroupSizeY+1`
 # https://youtu.be/watch?v=jWmtNGqub8c
 # https://github.com/cwpearson/nvidia-performance-tools
+# https://siboehm.com/articles/22/CUDA-MMM
 import emulate_device, malebolgia, malebolgia/lockers, std/[math, strutils]
 
 proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;

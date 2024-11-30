@@ -6,7 +6,7 @@ type
     x, y: uint32
 
 proc updateUniformBuffer(device: VkDevice, memory: VkDeviceMemory, data: pointer,
-                          dataSize: VkDeviceSize) =
+                         dataSize: VkDeviceSize) =
   let mappedMemory = mapMemory(device, memory, 0.VkDeviceSize, dataSize, 0.VkMemoryMapFlags)
   copyMem(mappedMemory, data, dataSize.int)
   unmapMemory(device, memory)
@@ -45,12 +45,12 @@ proc main =
   # Create buffers
   let (storageBuffer, storageBufferMemory) = createBuffer(
     device, physicalDevice, storageSize,
-    VkBufferUsageFlags{VkBufferUsageFlagBits.StorageBufferBit},
+    VkBufferUsageFlags{StorageBufferBit},
     VkMemoryPropertyFlags{HostCoherentBit, HostVisibleBit}
   )
   let (uniformBuffer, uniformBufferMemory) = createBuffer(
-    device, physicalDevice, storageSize,
-    VkBufferUsageFlags{VkBufferUsageFlagBits.UniformBufferBit},
+    device, physicalDevice, uniformSize,
+    VkBufferUsageFlags{UniformBufferBit},
     VkMemoryPropertyFlags{HostCoherentBit, HostVisibleBit}
   )
   # Map the memory and write to the uniform buffer

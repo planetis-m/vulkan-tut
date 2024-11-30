@@ -1,5 +1,6 @@
 # Compile with at least `-d:ThreadPoolSize=workgroupSize*workgroupSize+1`
 # https://youtu.be/QGYvbsHDPxo and https://youtu.be/jWmtNGqub8c
+# https://siboehm.com/articles/22/CUDA-MMM
 import emulate_device, std/[math, strutils], malebolgia, malebolgia/lockers
 
 proc sgemmShader(env: GlEnvironment; barrier: BarrierHandle;

@@ -46,6 +46,7 @@ void main() {
       sharedB[i * TILE_SIZE_B + j] = 0.0;
     }
     // Wait for the tile to be loaded before doing computation
+    memoryBarrierShared();
     barrier();
 
     for (uint i = 0; i < TILE_SIZE_RATIO; i++) {
@@ -60,6 +61,7 @@ void main() {
       }
     }
     // Wait for all threads to finish using current tiles before loading new tiles
+    memoryBarrierShared();
     barrier();
   }
 

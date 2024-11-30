@@ -47,6 +47,7 @@ void main() {
     }
 
     // Wait for both tiles to be loaded before doing computation
+    memoryBarrierShared();
     barrier();
 
     // Compute the partial product for this tile
@@ -55,6 +56,7 @@ void main() {
     }
 
     // Wait for all threads to finish using current tiles before loading new tiles
+    memoryBarrierShared();
     barrier();
   }
 

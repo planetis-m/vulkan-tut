@@ -53,12 +53,14 @@ void main() {
     globalIdx += gridSize;
   }
   sharedData[localIdx] = sum;
+  memoryBarrierShared();
   barrier();
 
   for (uint stride = localSize / 2; stride > WARP_SIZE; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
+    memoryBarrierShared();
     barrier();
   }
 

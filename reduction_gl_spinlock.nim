@@ -4,7 +4,7 @@ import opengl, glut, glerrors, glhelpers, glshaderc, std/[strformat, times]
 const
   WorkGroupSize = 256 # Shader doesn't work with workgroup <= 64
   NumElements = 1048576
-  CoerseFactor = 1
+  CoerseFactor = 1024
   NumWorkGroups = NumElements div (WorkGroupSize * 2 * CoerseFactor)
 
 type
