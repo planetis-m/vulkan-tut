@@ -3,8 +3,10 @@
 layout(local_size_x_id = 0) in;
 layout(constant_id = 0) const uint SECTION_SIZE = 32;
 
-// Uniform for array size
-layout(location = 0) uniform uint arraySize;
+layout(std140, binding = 3) uniform ScanParams {
+  uint arraySize;
+  uint isExclusive;
+};
 
 // Input buffer
 layout(std430, binding = 0) buffer InputBuffer {
@@ -26,30 +28,39 @@ void main() {
   // Get global and local indices
   uint globalIndex = gl_GlobalInvocationID.x;
   uint localIndex = gl_LocalInvocationID.x;
+  uint blockIndex = gl_WorkGroupID.x;
 
   // Load data into shared memory
-  if (globalIndex < arraySize) {
-    sharedData[localIndex] = inputData[globalIndex];
+  if (isExclusive != 0) {
+    if (globalIndex < arraySize && localIndex != 0) {
+      sharedData[localIndex] = inputData[globalIndex - 1];
+    } else {
+      sharedData[localIndex] = 0.0f;  // First element becomes 0
+    }
   } else {
-    sharedData[localIndex] = 0.0f;
+    if (globalIndex < arraySize) {
+      sharedData[localIndex] = inputData[globalIndex];
+    } else {
+      sharedData[localIndex] = 0.0f;
+    }
   }
+  memoryBarrierShared();
+  barrier();
 
   // Kogge-Stone parallel scan
   for (uint stride = 1; stride < gl_WorkGroupSize.x; stride *= 2) {
-    memoryBarrierShared();
-    barrier();
-
     float currentSum;
     if (localIndex >= stride) {
       currentSum = sharedData[localIndex] + sharedData[localIndex - stride];
     }
-
     memoryBarrierShared();
     barrier();
 
     if (localIndex >= stride) {
-      sharedData[localIndex] = currentSum;
+      sharedData[localIndex] += currentSum;
     }
+    memoryBarrierShared();
+    barrier();
   }
 
   // Store partial sums and block sums
@@ -57,7 +68,7 @@ void main() {
     partialSums[globalIndex] = sharedData[localIndex];
     // Last thread in block stores sum for block-level scan
     if (localIndex == gl_WorkGroupSize.x - 1) {
-      blockSums[blockIndex] = sharedData[localIndex];
+      blockSums[globalIndex] = sharedData[localIndex];
     }
   }
 }

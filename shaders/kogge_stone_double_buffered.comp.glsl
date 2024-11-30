@@ -3,8 +3,10 @@
 layout(local_size_x_id = 0) in;
 layout(constant_id = 0) const uint SECTION_SIZE = 32;
 
-// Uniform for array size
-layout(location = 0) uniform uint arraySize;
+layout(std140, binding = 3) uniform ScanParams {
+  uint arraySize;
+  uint isExclusive;
+};
 
 // Input buffer
 layout(std430, binding = 0) buffer InputBuffer {
@@ -27,12 +29,21 @@ void main() {
   // Get global and local indices
   uint globalIndex = gl_GlobalInvocationID.x;
   uint localIndex = gl_LocalInvocationID.x;
+  uint blockIndex = gl_WorkGroupID.x;
 
   // Load data into shared memory
-  if (globalIndex < arraySize) {
-    sharedDataA[localIndex] = inputData[globalIndex];
+  if (isExclusive != 0) {
+    if (globalIndex < arraySize && localIndex != 0) {
+      sharedDataA[localIndex] = inputData[globalIndex - 1];
+    } else {
+      sharedDataA[localIndex] = 0.0f;  // First element becomes 0
+    }
   } else {
-    sharedDataA[localIndex] = 0.0f;
+    if (globalIndex < arraySize) {
+      sharedDataA[localIndex] = inputData[globalIndex];
+    } else {
+      sharedDataA[localIndex] = 0.0f;
+    }
   }
   memoryBarrierShared();
   barrier();
@@ -42,9 +53,9 @@ void main() {
   for (uint stride = 1; stride < gl_WorkGroupSize.x; stride *= 2) {
     if (localIndex >= stride) {
       if (useA) {
-        sharedDataB = sharedDataA[localIndex] + sharedDataA[localIndex - stride];
+        sharedDataB[localIndex] = sharedDataA[localIndex] + sharedDataA[localIndex - stride];
       } else {
-        sharedDataA = sharedDataB[localIndex] + sharedDataB[localIndex - stride];
+        sharedDataA[localIndex] = sharedDataB[localIndex] + sharedDataB[localIndex - stride];
       }
     } else {
       if (useA) {
