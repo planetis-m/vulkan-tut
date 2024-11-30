@@ -14,11 +14,11 @@ layout(std430, binding = 0) buffer InputBuffer {
 };
 
 layout(std430, binding = 1) buffer OutputBuffer {
-  float partialSums[];  // Size = arraySize, stores intermediate results
+  float outputData[]; // Size = arraySize, stores intermediate results
 };
 
 layout(std430, binding = 2) buffer BlockSumsBuffer {
-  float blockSums[];    // Size = numWorkGroups, stores last element of each block
+  float partialSums[]; // Size = numWorkGroups, stores last element of each block
 };
 
 // Shared memory for parallel reduction
@@ -73,11 +73,11 @@ void main() {
   // Store partial sums and block sums
   if (globalIndex < arraySize) {
     float result = useA ? sharedDataA[localIndex] : sharedDataB[localIndex];
-    partialSums[globalIndex] = result;
+    outputData[globalIndex] = result;
 
     // Last thread in block stores sum for block-level scan
     if (localIndex == gl_WorkGroupSize.x - 1) {
-      blockSums[blockIndex] = result;
+      partialSums[blockIndex] = result;
     }
   }
 }
