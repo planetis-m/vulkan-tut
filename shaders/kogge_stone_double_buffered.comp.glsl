@@ -20,7 +20,8 @@ layout(std430, binding = 2) buffer BlockSumsBuffer {
 };
 
 // Shared memory for parallel reduction
-shared float sharedData[SECTION_SIZE];
+shared float sharedDataA[SECTION_SIZE];
+shared float sharedDataB[SECTION_SIZE];
 
 void main() {
   // Get global and local indices
@@ -29,35 +30,43 @@ void main() {
 
   // Load data into shared memory
   if (globalIndex < arraySize) {
-    sharedData[localIndex] = inputData[globalIndex];
+    sharedDataA[localIndex] = inputData[globalIndex];
   } else {
-    sharedData[localIndex] = 0.0f;
+    sharedDataA[localIndex] = 0.0f;
   }
+  memoryBarrierShared();
+  barrier();
 
-  // Kogge-Stone parallel scan
+  // Double buffered Kogge-Stone parallel scan
+  bool useA = true;
   for (uint stride = 1; stride < gl_WorkGroupSize.x; stride *= 2) {
+    if (localIndex >= stride) {
+      if (useA) {
+        sharedDataB = sharedDataA[localIndex] + sharedDataA[localIndex - stride];
+      } else {
+        sharedDataA = sharedDataB[localIndex] + sharedDataB[localIndex - stride];
+      }
+    } else {
+      if (useA) {
+        sharedDataB[localIndex] = sharedDataA[localIndex];
+      } else {
+        sharedDataA[localIndex] = sharedDataB[localIndex];
+      }
+    }
     memoryBarrierShared();
     barrier();
 
-    float currentSum;
-    if (localIndex >= stride) {
-      currentSum = sharedData[localIndex] + sharedData[localIndex - stride];
-    }
-
-    memoryBarrierShared();
-    barrier();
-
-    if (localIndex >= stride) {
-      sharedData[localIndex] = currentSum;
-    }
+    useA = !useA;
   }
 
   // Store partial sums and block sums
   if (globalIndex < arraySize) {
-    partialSums[globalIndex] = sharedData[localIndex];
+    float result = useA ? sharedDataA[localIndex] : sharedDataB[localIndex];
+    partialSums[globalIndex] = result;
+
     // Last thread in block stores sum for block-level scan
     if (localIndex == gl_WorkGroupSize.x - 1) {
-      blockSums[blockIndex] = sharedData[localIndex];
+      blockSums[blockIndex] = result;
     }
   }
 }
