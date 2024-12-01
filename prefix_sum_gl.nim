@@ -85,21 +85,26 @@ proc dispatchAdd(resources: PrefixSum;
     # Ensure all work is done
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
 
+proc updateUniformBuffer(uniformBuffer, arraySize, isExclusive: GLuint) =
+  let uniform = ScanParamsBuffer(
+    arraySize: arraySize,
+    isExclusive: isExclusive
+  )
+  glNamedBufferSubData(uniformBuffer, 0, sizeof(uniform), addr uniform)
+
 proc performScan(resources: var PrefixSum, inputBuffer, outputBuffer, numElements: GLuint) =
   # Calculate NumWorkgroups using ceilDiv
   let numWorkGroups = ceilDiv(numElements, WorkgroupSize).GLuint
   # PartialSums buffer
-  let partialSumsBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, numWorkGroups.int*sizeof(float32), nil, GL_STATIC_DRAW)
-  # Uniform buffer
-  let uniform = ScanParamsBuffer(arraySize: numElements.uint32, isExclusive: 0)
-  glNamedBufferSubData(resources.uniformBuffer, 0, sizeof(uniform), addr uniform)
+  let partialSumsBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER,
+      numWorkGroups.GLsizeiptr*sizeof(float32), nil, GL_STATIC_DRAW)
+  updateUniformBuffer(resources.uniformBuffer, numElements, 0)
   dispatchPrefixSum(resources, inputBuffer, outputBuffer, partialSumsBuffer, numWorkGroups)
   if numWorkGroups > 1:
     # Scan partial sums
     performScan(resources, partialSumsBuffer, partialSumsBuffer, numWorkGroups)
     # Add scanned sums
-    let uniform = ScanParamsBuffer(arraySize: numElements.uint32, isExclusive: 0)
-    glNamedBufferSubData(resources.uniformBuffer, 0, sizeof(uniform), addr uniform)
+    updateUniformBuffer(resources.uniformBuffer, numElements, 0)
     dispatchAdd(resources, outputBuffer, partialSumsBuffer, numElements)
   glDeleteBuffers(1, addr partialSumsBuffer)
 
