@@ -2,6 +2,7 @@
 # https://www.youtube.com/watch?v=DrD3eIw74RY
 # https://www.youtube.com/watch?v=-eoUw8fTy2E
 # https://www.youtube.com/watch?v=CcwdWP44aFE
+# Compile with at least `-d:ThreadPoolSize=workgroupSize+1`
 
 import emulate_device, std/math, malebolgia, malebolgia/lockers
 
@@ -98,6 +99,7 @@ proc main =
   runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
     prefixSumShader(env, barrier.getHandle(), buffers, addr shared, numElements, isExclusive)
 
+  # if gridSize > 1:
   unprotected buffers as b:
     cumsum(b.partialSums)
 
