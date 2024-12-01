@@ -17,7 +17,7 @@ layout(std430, binding = 1) buffer OutputBuffer {
   float outputData[]; // Size = arraySize, stores intermediate results
 };
 
-layout(std430, binding = 2) buffer BlockSumsBuffer {
+layout(std430, binding = 2) buffer PartialSumsBuffer {
   float partialSums[]; // Size = numWorkGroups, stores last element of each block
 };
 
@@ -29,7 +29,7 @@ void main() {
   // Get global and local indices
   uint globalIndex = gl_GlobalInvocationID.x;
   uint localIndex = gl_LocalInvocationID.x;
-  uint blockIndex = gl_WorkGroupID.x;
+  uint groupIndex = gl_WorkGroupID.x;
 
   // Load data into shared memory
   if (isExclusive != 0) {
@@ -77,7 +77,7 @@ void main() {
 
     // Last thread in block stores sum for block-level scan
     if (localIndex == gl_WorkGroupSize.x - 1) {
-      partialSums[blockIndex] = result;
+      partialSums[groupIndex] = (isExclusive != 0u) ? result + inputData[globalIndex] : result;
     }
   }
 }
