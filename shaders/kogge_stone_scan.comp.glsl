@@ -48,7 +48,7 @@ void main() {
   barrier();
 
   // Kogge-Stone parallel scan
-  for (uint stride = 1; stride < gl_WorkGroupSize.x; stride *= 2) {
+  for (uint stride = 1; stride < gl_WorkGroupSize.x / 2; stride *= 2) {
     float currentSum;
     if (localIndex >= stride) {
       currentSum = sharedData[localIndex] + sharedData[localIndex - stride];
@@ -68,7 +68,7 @@ void main() {
     outputData[globalIndex] = sharedData[localIndex];
     // Last thread in block stores sum for block-level scan
     if (localIndex == gl_WorkGroupSize.x - 1) {
-      partialSums[globalIndex] = sharedData[localIndex];
+      partialSums[blockIndex] = sharedData[localIndex];
     }
   }
 }

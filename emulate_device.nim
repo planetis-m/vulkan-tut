@@ -6,6 +6,10 @@
 ## It organizes work into workgroups and invocations, similar to how compute shaders operate
 ## on GPUs.
 ##
+## ## Warning
+## Using `barrier()` within conditional branches leads to undefined behavior. The emulator is
+## modeled using a single barrier that must be accessible from all threads within a workgroup.
+##
 ## ## Parameters
 ##
 ## - `numWorkGroups: UVec3` The number of workgroups in each dimension (x, y, z).
