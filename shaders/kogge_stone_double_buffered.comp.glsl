@@ -50,7 +50,7 @@ void main() {
 
   // Double buffered Kogge-Stone parallel scan
   bool useA = true;
-  for (uint stride = 1; stride < gl_WorkGroupSize.x / 2; stride *= 2) {
+  for (uint stride = 1; stride < gl_WorkGroupSize.x; stride *= 2) {
     if (localIndex >= stride) {
       if (useA) {
         sharedDataB[localIndex] = sharedDataA[localIndex] + sharedDataA[localIndex - stride];
