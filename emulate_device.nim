@@ -84,27 +84,28 @@ proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
 
 template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; smem, compute: untyped) =
-  var env {.inject.}: GlEnvironment
-  env.gl_NumWorkGroups = numWorkGroups
-  env.gl_WorkGroupSize = workGroupSize
+  block:
+    var env {.inject.}: GlEnvironment
+    env.gl_NumWorkGroups = numWorkGroups
+    env.gl_WorkGroupSize = workGroupSize
 
-  for wgZ in 0 ..< numWorkGroups.z:
-    for wgY in 0 ..< numWorkGroups.y:
-      for wgX in 0 ..< numWorkGroups.x:
-        env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-        # echo "New workgroup! id ", wgX, ", ", wgY
-        var shared {.inject.} = smem
+    for wgZ in 0 ..< numWorkGroups.z:
+      for wgY in 0 ..< numWorkGroups.y:
+        for wgX in 0 ..< numWorkGroups.x:
+          env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
+          # echo "New workgroup! id ", wgX, ", ", wgY
+          var shared {.inject.} = smem
 
-        var barrier {.inject.} = createBarrier(workGroupSize.x * workGroupSize.y * workGroupSize.z)
-        var master = createMaster(activeProducer = true)
-        master.awaitAll:
-          for z in 0 ..< workGroupSize.z:
-            for y in 0 ..< workGroupSize.y:
-              for x in 0 ..< workGroupSize.x:
-                env.gl_LocalInvocationID = uvec3(x, y, z)
-                env.gl_GlobalInvocationID = uvec3(
-                  wgX * workGroupSize.x + x,
-                  wgY * workGroupSize.y + y,
-                  wgZ * workGroupSize.z + z
-                )
-                master.spawn compute
+          var barrier {.inject.} = createBarrier(workGroupSize.x * workGroupSize.y * workGroupSize.z)
+          var master = createMaster(activeProducer = true)
+          master.awaitAll:
+            for z in 0 ..< workGroupSize.z:
+              for y in 0 ..< workGroupSize.y:
+                for x in 0 ..< workGroupSize.x:
+                  env.gl_LocalInvocationID = uvec3(x, y, z)
+                  env.gl_GlobalInvocationID = uvec3(
+                    wgX * workGroupSize.x + x,
+                    wgY * workGroupSize.y + y,
+                    wgZ * workGroupSize.z + z
+                  )
+                  master.spawn compute

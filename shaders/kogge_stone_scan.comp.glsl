@@ -57,7 +57,7 @@ void main() {
     barrier();
 
     if (localIndex >= stride) {
-      sharedData[localIndex] += currentSum;
+      sharedData[localIndex] = currentSum;
     }
     memoryBarrierShared();
     barrier();

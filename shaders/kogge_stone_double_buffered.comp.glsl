@@ -72,7 +72,7 @@ void main() {
 
   // Store partial sums and block sums
   if (globalIndex < arraySize) {
-    float result = useA ? sharedDataB[localIndex] : sharedDataA[localIndex];
+    float result = useA ? sharedDataA[localIndex] : sharedDataB[localIndex];
     outputData[globalIndex] = result;
 
     // Last thread in block stores sum for block-level scan
