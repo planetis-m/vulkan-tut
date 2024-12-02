@@ -17,7 +17,7 @@ layout(binding = 1) buffer OutputBuffer {
 };
 
 layout(set = 0, binding = 2) uniform UniformBlock {
-  uint n;
+  uint arraySize;
 };
 
 void warpReduce(uint localIdx) {
@@ -48,8 +48,10 @@ void main() {
   uint gridSize = localSize * 2 * gl_NumWorkGroups.x;
 
   int sum = 0;
-  while (globalIdx < n) {
+  while (globalIdx < arraySize) {
     sum += inputData[globalIdx] + inputData[globalIdx + localSize];
+//     sum += inputData[globalIdx] +
+//       (((globalIdx + localSize) < arraySize) ? inputData[globalIdx + localSize] : 0);
     globalIdx += gridSize;
   }
   sharedData[localIdx] = sum;

@@ -23,24 +23,14 @@ void main() {
   uint localSize = gl_WorkGroupSize.x;
   uint globalIdx = gl_WorkGroupID.x * localSize * 2 * coerseFactor + localIdx;
 
-  int sum;
-  uint endIdx = globalIdx + (coerseFactor * 2 - 1) * localSize;
+  int sum = 0;
+  uint baseIdx = globalIdx;
 
-  if (globalIdx >= arraySize) { // All indices out of bounds
-    sum = 0;
-  } else if (endIdx < arraySize) { // All indices in bounds
-    sum = inputData[globalIdx];
-    for (uint tile = 1; tile < coerseFactor * 2; tile++) {
-      sum += inputData[globalIdx + tile * localSize];
-    }
-  } else { // Mixed case - keep original bound check
-    sum = inputData[globalIdx];
-    for (uint tile = 1; tile < coerseFactor * 2; tile++) {
-      uint idx = globalIdx + tile * localSize;
-      if (idx < arraySize) {
-        sum += inputData[idx];
-      }
-    }
+  for (uint tile = 0; tile < coerseFactor; tile++) {
+    sum += inputData[baseIdx] + inputData[baseIdx + localSize];
+//     sum += inputData[baseIdx] +
+//       (((baseIdx + localSize) < arraySize) ? inputData[baseIdx + localSize] : 0);
+    baseIdx += 2 * localSize;
   }
   sharedData[localIdx] = sum;
   memoryBarrierShared();
