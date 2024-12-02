@@ -53,7 +53,7 @@ proc main =
   for i in 0..<numElements:
     inputData[i] = int32(i)
 
-  var buffers = initLocker (input: inputData, output: newSeq[int32](numWorkGroups.x))
+  var buffers = initLocker (input: ensureMove(inputData), output: newSeq[int32](numWorkGroups.x))
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):

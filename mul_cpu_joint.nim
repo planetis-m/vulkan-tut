@@ -66,7 +66,7 @@ proc main =
   for i in 0..<K*N:
     B[i] = float32(i)
 
-  var buffers = initLocker (A: A, B: B, C: newSeq[float32](M * N))
+  var buffers = initLocker (A: ensureMove A, B: ensureMove B, C: newSeq[float32](M * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[float32](localSizeRatio * localSizeB)):

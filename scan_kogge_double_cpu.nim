@@ -94,7 +94,7 @@ proc main =
     inputData[i] = int32(i)
 
   var buffers = initLocker (
-    input: inputData,
+    input: ensureMove(inputData),
     output: newSeq[int32](numElements),
     partialSums: newSeq[int32](numWorkGroups.x) # gridSize
   )
