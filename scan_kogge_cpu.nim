@@ -76,12 +76,11 @@ proc addShader(env: GlEnvironment, barrier: BarrierHandle,
 const
   numElements = 256
   localSize = 4 # workgroupSize
-  gridSize = numElements div localSize # numWorkGroups
   isExclusive = 0
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(gridSize, 1, 1)
+  let numWorkGroups = uvec3(ceilDiv(numElements, localSize).uint, 1, 1)
   let workGroupSize = uvec3(localSize, 1, 1)
 
   # Fill the input buffer
@@ -92,7 +91,7 @@ proc main =
   var buffers = initLocker (
     input: inputData,
     output: newSeq[int32](numElements),
-    partialSums: newSeq[int32](gridSize)
+    partialSums: newSeq[int32](numWorkGroups.x)
   )
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.

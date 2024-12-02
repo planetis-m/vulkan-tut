@@ -43,11 +43,11 @@ const
   numElements = 256
   coerseFactor = 4
   localSize = 4 # workgroupSize
-  gridSize = numElements div (localSize * 2 * coerseFactor) # numWorkGroups
+  segment = localSize * 2 * coerseFactor
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(gridSize, 1, 1)
+  let numWorkGroups = uvec3(ceilDiv(numElements, segment).uint, 1, 1)
   let workGroupSize = uvec3(localSize, 1, 1)
 
   # Fill the input buffer
