@@ -31,19 +31,19 @@ void main() {
   uint globalRow = gl_WorkGroupID.y * gl_WorkGroupSize.y + localRow;
   uint globalCol = gl_WorkGroupID.x * gl_WorkGroupSize.x + localCol;
 
-  float sum = 0.0;
+  float sum = 0.0f;
   for (uint tileIndex = 0; tileIndex < (K + TILE_SIZE - 1) / TILE_SIZE; tileIndex++) {
     // Load tiles into shared memory
     if (globalRow < M && (tileIndex * TILE_SIZE + localCol) < K) {
       sharedA[localCol * TILE_SIZE + localRow] = A[globalRow * K + tileIndex * TILE_SIZE + localCol];
     } else {
-      sharedA[localCol * TILE_SIZE + localRow] = 0.0;
+      sharedA[localCol * TILE_SIZE + localRow] = 0.0f;
     }
 
     if (globalCol < N && (tileIndex * TILE_SIZE + localRow) < K) {
       sharedB[localRow * TILE_SIZE + localCol] = B[(tileIndex * TILE_SIZE + localRow) * N + globalCol];
     } else {
-      sharedB[localRow * TILE_SIZE + localCol] = 0.0;
+      sharedB[localRow * TILE_SIZE + localCol] = 0.0f;
     }
 
     // Wait for both tiles to be loaded before doing computation

@@ -33,7 +33,7 @@ void main() {
 
   float cReg[TILE_SIZE_B];
   for (uint i = 0; i < TILE_SIZE_B; i++) {
-    cReg[i] = 0.0;
+    cReg[i] = 0.0f;
   }
 
   for (uint tileIndex = 0; tileIndex < (K + TILE_SIZE_RATIO - 1) / TILE_SIZE_RATIO; tileIndex++) {
@@ -43,7 +43,7 @@ void main() {
     if (col + j < N && (tileIndex * TILE_SIZE_RATIO + i) < K) {
       sharedB[i * TILE_SIZE_B + j] = B[(tileIndex * TILE_SIZE_RATIO + i) * N + col + j];
     } else {
-      sharedB[i * TILE_SIZE_B + j] = 0.0;
+      sharedB[i * TILE_SIZE_B + j] = 0.0f;
     }
     // Wait for the tile to be loaded before doing computation
     memoryBarrierShared();
@@ -51,7 +51,7 @@ void main() {
 
     for (uint i = 0; i < TILE_SIZE_RATIO; i++) {
       // Load tile of matrix A into register
-      float aReg = 0.0;
+      float aReg = 0.0f;
       if (row < M && (tileIndex * TILE_SIZE_RATIO + i) < K) {
         aReg = A[row * K + (tileIndex * TILE_SIZE_RATIO + i)];
       }
