@@ -15,6 +15,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     var sum = b.input[globalIdx]
   for tile in 1 ..< 2 * coerseFactor:
     # echo "ThreadId ", localIdx, " index: ", globalIdx + tile * localSize
+    # if globalIdx + tile.uint * localSize < n:
     unprotected buffers as b:
       sum = sum + b.input[globalIdx + tile.uint * localSize]
   smem[localIdx] = sum

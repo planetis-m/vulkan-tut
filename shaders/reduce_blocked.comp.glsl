@@ -5,15 +5,16 @@ layout(local_size_x_id = 0) in;
 layout(constant_id = 0) const uint SHARED_SIZE = 32;
 shared int sharedData[SHARED_SIZE];
 
-layout(binding = 0) buffer InputBuffer {
+layout(std430, binding = 0) buffer InputBuffer {
   int inputData[];
 };
 
-layout(binding = 1) buffer OutputBuffer {
+layout(std430, binding = 1) buffer OutputBuffer {
   int outputData[];
 };
 
-layout(set = 0, binding = 2) uniform UniformBlock {
+layout(std140, binding = 2) uniform UniformBlock {
+  uint arraySize;
   uint coerseFactor;
 };
 
@@ -22,9 +23,24 @@ void main() {
   uint localSize = gl_WorkGroupSize.x;
   uint globalIdx = gl_WorkGroupID.x * localSize * 2 * coerseFactor + localIdx;
 
-  int sum = inputData[globalIdx];
-  for (uint tile = 1; tile < coerseFactor * 2; tile++) {
-    sum += inputData[globalIdx + tile * localSize];
+  int sum;
+  uint endIdx = globalIdx + (coerseFactor * 2 - 1) * localSize;
+
+  if (globalIdx >= arraySize) { // All indices out of bounds
+    sum = 0;
+  } else if (endIdx < arraySize) { // All indices in bounds
+    sum = inputData[globalIdx];
+    for (uint tile = 1; tile < coerseFactor * 2; tile++) {
+      sum += inputData[globalIdx + tile * localSize];
+    }
+  } else { // Mixed case - keep original bound check
+    sum = inputData[globalIdx];
+    for (uint tile = 1; tile < coerseFactor * 2; tile++) {
+      uint idx = globalIdx + tile * localSize;
+      if (idx < arraySize) {
+        sum += inputData[idx];
+      }
+    }
   }
   sharedData[localIdx] = sum;
   memoryBarrierShared();
