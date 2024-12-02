@@ -128,6 +128,11 @@ proc createDevice(x: var MandelbrotGenerator) =
     queuePriorities = queuePriority
   )
   let layers = getLayers()
+  # let features = VkPhysicalDeviceFeatures(
+  #   robustBufferAccess: true.VkBool32,
+  #   fragmentStoresAndAtomics: true.VkBool32,
+  #   vertexPipelineStoresAndAtomics: true.VkBool32
+  # )
   let deviceCreateInfo = newVkDeviceCreateInfo(
     queueCreateInfos = [queueCreateInfo],
     pEnabledLayerNames = layers,

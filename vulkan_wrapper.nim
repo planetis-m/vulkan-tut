@@ -51,6 +51,9 @@ proc getQueueFamilyProperties*(physicalDevice: VkPhysicalDevice): seq[VkQueueFam
   result.setLen(queueFamilyCount)
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount.addr, result[0].addr)
 
+proc getPhysicalDeviceFeatures*(physicalDevice: VkPhysicalDevice): VkPhysicalDeviceFeatures =
+  vkGetPhysicalDeviceFeatures(physicalDevice, result.addr)
+
 proc getPhysicalDeviceMemoryProperties*(physicalDevice: VkPhysicalDevice): VkPhysicalDeviceMemoryProperties =
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, result.addr)
 
