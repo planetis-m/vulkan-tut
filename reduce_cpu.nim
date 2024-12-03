@@ -18,10 +18,8 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
   while globalIdx < n:
     # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     unprotected buffers as b:
-      sum += b.input[globalIdx]
-    if globalIdx + localSize < n:
-      unprotected buffers as b:
-        sum += b.input[globalIdx + localSize]
+      sum += b.input[globalIdx] +
+        (if globalIdx + localSize < n: b.input[globalIdx + localSize] else: 0)
     globalIdx = globalIdx + gridSize
   smem[localIdx] = sum
 
