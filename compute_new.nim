@@ -16,11 +16,11 @@ proc updateUniformBuffer(device: VkDevice, memory: VkDeviceMemory, data: pointer
   unmapMemory(device, memory)
 
 proc fetchRenderedImage(device: VkDevice, memory: VkDeviceMemory,
-                        size: VkDeviceSize, count: int): seq[ColorRGBA] =
+                        size: VkDeviceSize): seq[ColorRGBA] =
   let mappedMemory = mapMemory(device, memory, 0.VkDeviceSize, size,
                                0.VkMemoryMapFlags)
   let data = cast[ptr UncheckedArray[Color]](mappedMemory)
-  result = newSeq[ColorRGBA](count)
+  result = newSeq[ColorRGBA](size.int div sizeof(Color))
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).
   for i in 0..result.high:
     result[i] = rgba(data[i])
@@ -140,8 +140,7 @@ proc main =
   let data = fetchRenderedImage(
     device = device,
     memory = storageBufferMemory,
-    size = storageSize,
-    count = Width * Height
+    size = storageSize
   )
   # Encode and save image data to a QOI format file
   saveQoiImage(data, Width, Height, "mandelbrot.qoi")

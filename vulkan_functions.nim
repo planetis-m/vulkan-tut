@@ -8,7 +8,7 @@ proc getLayers*(): seq[cstring] =
 proc getExtensions*(): seq[cstring] =
   result = @[]
   when defined(vkDebug):
-    result.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
+    result.add(VkExtDebugUtilsExtensionName)
 
 proc createInstance*(appName, engineName: cstring,
                      layers, extensions: openarray[cstring],
