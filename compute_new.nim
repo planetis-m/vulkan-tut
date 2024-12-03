@@ -1,4 +1,5 @@
-import vulkan, vulkan_wrapper, vulkan_functions, vulkan_shaderc, std/math, chroma, pixie/fileformats/qoi
+import vulkan, vulkan_wrapper, vulkan_functions, vulkan_shaderc,
+  std/math, chroma, pixie/fileformats/qoi
 
 const
   Width = 1024
@@ -14,8 +15,9 @@ proc updateUniformBuffer(device: VkDevice, memory: VkDeviceMemory, data: pointer
   copyMem(mappedMemory, data, dataSize.int)
   unmapMemory(device, memory)
 
-proc fetchRenderedImage(device: VkDevice, memory: VkDeviceMemory, count: int): seq[ColorRGBA] =
-  let mappedMemory = mapMemory(device, memory, 0.VkDeviceSize, VkDeviceSize(sizeof(Color)*count),
+proc fetchRenderedImage(device: VkDevice, memory: VkDeviceMemory,
+                        size: VkDeviceSize, count: int): seq[ColorRGBA] =
+  let mappedMemory = mapMemory(device, memory, 0.VkDeviceSize, size,
                                0.VkMemoryMapFlags)
   let data = cast[ptr UncheckedArray[Color]](mappedMemory)
   result = newSeq[ColorRGBA](count)
@@ -23,6 +25,11 @@ proc fetchRenderedImage(device: VkDevice, memory: VkDeviceMemory, count: int): s
   for i in 0..result.high:
     result[i] = rgba(data[i])
   unmapMemory(device, memory)
+
+proc saveQoiImage*(data: seq[ColorRGBA], width, height: int, filename: string) =
+  let qoi = Qoi(data: data, width: Width, height: Height, channels: 4)
+  let encoded = encodeQoi(qoi)
+  writeFile(filename, encoded)
 
 proc main =
   let layers = getLayers()
@@ -130,15 +137,14 @@ proc main =
     instance = instance
   )
   # Fetch data from VRAM to RAM
-  let count = Width*Height
-  let result = fetchRenderedImage(
+  let data = fetchRenderedImage(
     device = device,
     memory = storageBufferMemory,
-    count = count
+    size = storageSize,
+    count = Width * Height
   )
-  let qoi = Qoi(data: result, width: Width, height: Height, channels: 4)
-  let str = encodeQoi(qoi)
-  writeFile("mandelbrot.qoi", str)
+  # Encode and save image data to a QOI format file
+  saveQoiImage(data, Width, Height, "mandelbrot.qoi")
   # Clean up
   freeMemory(device, uniformBufferMemory)
   destroyBuffer(device, uniformBuffer)
