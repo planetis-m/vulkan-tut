@@ -1,4 +1,4 @@
-import opengl, glut, glerrors, glhelpers, glshaderc, std/[strformat, times, math]
+import opengl, glut, glerrors, glhelpers, glshaderc, std/[strformat, times, math, random]
 
 const
   WorkGroupSize = 256
@@ -108,13 +108,21 @@ proc performScan(resources: var PrefixSum, inputBuffer, outputBuffer, numElement
     dispatchAdd(resources, outputBuffer, partialSumsBuffer, numElements)
   glDeleteBuffers(1, addr partialSumsBuffer)
 
-proc readResults(resources: PrefixSum): float32 =
-  # Read back the results
-  result = 0
+proc readResults(resources: PrefixSum): seq[float32] =
+  result = newSeq[float32](NumElements)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.outputBuffer)
   let outputDataPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  result = outputDataPtr[NumElements-1]
+  copyMem(result[0].addr, outputDataPtr, NumElements * sizeof(float32))
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
+
+proc checkRandomSamples(shaderResult: seq[float32]; n, numSamples: int): bool =
+  for _ in 0..<numSamples:
+    let idx = rand(n-1)
+    let expected = float32(idx * (idx + 1) div 2)
+    # if abs(shaderResult[idx] - expected) > 1e-5:
+    if shaderResult[idx] != expected:
+      return false
+  result = true
 
 proc main() =
   var resources: PrefixSum
@@ -125,7 +133,8 @@ proc main() =
     performScan(resources, resources.inputBuffer, resources.outputBuffer, NumElements)
     let result = readResults(resources)
     let duration = cpuTime() - start
-    echo "Final prefix sum result: ", result
+    doAssert checkRandomSamples(result, 5793, 1_000)
+    echo "Final prefix sum result: ", result[^1]
     echo &"Total CPU runtime: {duration*1_000:.4f} ms"
   finally:
     cleanup(resources)
