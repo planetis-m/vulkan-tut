@@ -31,20 +31,35 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
   # Memory barrier equivalent
   wait barrier
 
-  # Kogge-Stone parallel scan
-  var stride: uint = 1
-  while stride < localSize:
+  # # Kogge-Stone parallel scan
+  # var stride: uint = 1
+  # while stride < localSize:
+  #   var currentSum: int32 = 0
+  #   if localIdx >= stride:
+  #     currentSum = smem[localIdx] + smem[localIdx - stride]
+  #
+  #   wait barrier
+  #
+  #   if localIdx >= stride:
+  #     smem[localIdx] = currentSum
+  #
+  #   wait barrier
+  #   stride *= 2
+
+  var stride = localSize div 2
+  while stride > 0:
     var currentSum: int32 = 0
-    if localIdx >= stride:
-      currentSum = smem[localIdx] + smem[localIdx - stride]
+    let idx = localSize - 1 - localIdx
+    if idx >= stride:
+      currentSum = smem[idx] + smem[idx - stride]
 
     wait barrier
 
-    if localIdx >= stride:
-      smem[localIdx] = currentSum
+    if idx >= stride:
+      smem[idx] = currentSum
 
     wait barrier
-    stride *= 2
+    stride = stride div 2
 
   # Store results and partial sums
   if globalIdx < n:
