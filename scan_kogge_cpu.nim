@@ -49,14 +49,13 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
   var stride = localSize div 2
   while stride > 0:
     var currentSum: int32 = 0
-    let idx = localSize - 1 - localIdx
-    if idx >= stride:
-      currentSum = smem[idx] + smem[idx - stride]
+    if localIdx < localSize - stride:
+      currentSum = smem[localIdx] + smem[localIdx + stride]
 
     wait barrier
 
-    if idx >= stride:
-      smem[idx] = currentSum
+    if localIdx < localSize - stride:
+      smem[localIdx + stride] = currentSum
 
     wait barrier
     stride = stride div 2
