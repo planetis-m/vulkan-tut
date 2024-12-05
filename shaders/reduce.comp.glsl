@@ -4,8 +4,8 @@
 #define BOUNDS_CHECK 0
 #endif
 
-#ifndef WARP_SIZE
-#define WARP_SIZE 32
+#ifndef SUBGROUP_SIZE
+#define SUBGROUP_SIZE 32
 #endif
 
 layout(local_size_x_id = 0) in;
@@ -25,11 +25,11 @@ layout(set = 0, binding = 2) uniform UniformBlock {
 };
 
 void warpReduce(uint localIdx) {
-  #if WARP_SIZE >= 64
+  #if SUBGROUP_SIZE >= 64
   sharedData[localIdx] += sharedData[localIdx + 64];
   memoryBarrierShared();
   #endif
-  #if WARP_SIZE >= 32
+  #if SUBGROUP_SIZE >= 32
   sharedData[localIdx] += sharedData[localIdx + 32];
   memoryBarrierShared();
   #endif
@@ -66,7 +66,7 @@ void main() {
   memoryBarrierShared();
   barrier();
 
-  for (uint stride = localSize / 2; stride > WARP_SIZE; stride >>= 1) {
+  for (uint stride = localSize / 2; stride > SUBGROUP_SIZE; stride >>= 1) {
     if (localIdx < stride) {
       sharedData[localIdx] += sharedData[localIdx + stride];
     }
@@ -75,7 +75,7 @@ void main() {
   }
 
   // Final reduction within each subgroup
-  if (localIdx < WARP_SIZE) {
+  if (localIdx < SUBGROUP_SIZE) {
     warpReduce(localIdx);
   }
 

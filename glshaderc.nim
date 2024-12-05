@@ -1,6 +1,6 @@
 import shaderc, opengl, glerrors, glhelpers
 
-const WarpSize {.intdefine.} = 64
+const SubgroupSize {.intdefine.} = 64
 
 proc addMacroDefinition(options: ShadercCompileOptionsT; name: string) {.inline.} =
   addMacroDefinition(options, name.cstring, name.len.csize_t, nil, 0)
@@ -15,7 +15,7 @@ proc createShaderModule*(program: GLuint, source: string, kind: ShadercShaderKin
     setTargetEnv(options, Opengl, 0)
     if optimize:
       setOptimizationLevel(options, Size)
-    addMacroDefinition(options, "WARP_SIZE", $WarpSize)
+    addMacroDefinition(options, "SUBGROUP_SIZE", $SubgroupSize)
     let module = compileIntoSpv(compiler, source.cstring, source.len.csize_t,
         ComputeShader, filename, "main", options)
     try:
