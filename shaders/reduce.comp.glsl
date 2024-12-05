@@ -1,11 +1,15 @@
 #version 450
 
-layout(local_size_x_id = 0) in;
+#ifndef BOUNDS_CHECK
+#define BOUNDS_CHECK 0
+#endif
 
-layout(constant_id = 0) const uint SHARED_SIZE = 32;
 #ifndef WARP_SIZE
 #define WARP_SIZE 32
 #endif
+
+layout(local_size_x_id = 0) in;
+layout(constant_id = 0) const uint SHARED_SIZE = 32;
 shared int sharedData[SHARED_SIZE];
 
 layout(binding = 0) buffer InputBuffer {
@@ -49,11 +53,15 @@ void main() {
 
   int sum = 0;
   while (globalIdx < arraySize) {
+#if !BOUNDS_CHECK
     sum += inputData[globalIdx] + inputData[globalIdx + localSize];
-//     sum += inputData[globalIdx] +
-//       (((globalIdx + localSize) < arraySize) ? inputData[globalIdx + localSize] : 0);
+#else
+    sum += inputData[globalIdx] +
+      (((globalIdx + localSize) < arraySize) ? inputData[globalIdx + localSize] : 0);
+#endif
     globalIdx += gridSize;
   }
+
   sharedData[localIdx] = sum;
   memoryBarrierShared();
   barrier();

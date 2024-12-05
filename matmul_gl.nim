@@ -77,8 +77,9 @@ proc readResults(resources: MatrixMultiplication): seq[float32] =
   result = newSeq[float32](M * N)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, resources.bufferC)
   let bufferCPtr = cast[ptr UncheckedArray[float32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY))
-  for i in 0..<M*N:
-    result[i] = bufferCPtr[i]
+  # for i in 0..<M*N:
+  #   result[i] = bufferCPtr[i]
+  copyMem(result[0].addr, bufferCPtr, M * N * sizeof(float32))
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 proc computeElement(m, n, p, row, col: int): float32 =

@@ -1,5 +1,9 @@
 #version 450
 
+#ifndef BOUNDS_CHECK
+#define BOUNDS_CHECK 0
+#endif
+
 layout(local_size_x_id = 0) in;
 
 layout(constant_id = 0) const uint SHARED_SIZE = 32;
@@ -27,9 +31,12 @@ void main() {
   uint baseIdx = globalIdx;
 
   for (uint tile = 0; tile < coerseFactor; tile++) {
+#if !BOUNDS_CHECK
     sum += inputData[baseIdx] + inputData[baseIdx + localSize];
-//     sum += inputData[baseIdx] +
-//       (((baseIdx + localSize) < arraySize) ? inputData[baseIdx + localSize] : 0);
+#else
+    sum += inputData[baseIdx] +
+      ((baseIdx + localSize < arraySize) ? inputData[baseIdx + localSize] : 0);
+#endif
     baseIdx += 2 * localSize;
   }
   sharedData[localIdx] = sum;
