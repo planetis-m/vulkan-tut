@@ -41,11 +41,12 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   if localIdx == 0:
     unprotected buffers as b:
+      var previous: int32 = 0
       if groupIdx > 0:
         while true:
           if load(b.status[groupIdx - 1]) == 1: break
-      b.output[groupIdx] =
-        (if groupIdx > 0: smem.buffer[0] + b.output[groupIdx - 1] else: smem.buffer[0])
+        previous = b.output[groupIdx - 1]
+      b.output[groupIdx] = smem.buffer[0] + previous
       store(b.status[groupIdx], 1) # Mark this group as complete
 
 # Main
