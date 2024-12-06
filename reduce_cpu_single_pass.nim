@@ -5,7 +5,9 @@
 import emulate_device, std/[atomics, math], malebolgia, malebolgia/lockers
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
-                     buffers: Locker[tuple[input, output: seq[int32]; globalId: Atomic[uint]]],
+                     buffers: Locker[tuple[input, output: seq[int32];
+                                           status: seq[Atomic[uint32]];
+                                           globalId: Atomic[uint]]],
                      smem: ptr tuple[buffer: seq[int32], localId: uint],
                      n, coerseFactor: uint) {.gcsafe.} =
 
@@ -39,8 +41,12 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   if localIdx == 0:
     unprotected buffers as b:
+      if groupIdx > 0:
+        while true:
+          if load(b.status[groupIdx - 1]) == 1: break
       b.output[groupIdx] =
         (if groupIdx > 0: smem.buffer[0] + b.output[groupIdx - 1] else: smem.buffer[0])
+      store(b.status[groupIdx], 1) # Mark this group as complete
 
 # Main
 const
@@ -62,6 +68,7 @@ proc main =
   var buffers = initLocker (
     input: ensureMove(inputData),
     output: newSeq[int32](numWorkGroups.x),
+    status: newSeq[Atomic[uint32]](numWorkGroups.x),
     globalId: default(Atomic[uint])
   )
 
