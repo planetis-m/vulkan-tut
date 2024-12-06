@@ -14,6 +14,9 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
   let gridSize = localSize * 2 * env.gl_NumWorkGroups.x
   var globalIdx = env.gl_WorkGroupID.x * localSize * 2 + localIdx
 
+  # Memory coalescing occurs when threads in the same subgroup access adjacent memory
+  # locations simultaneously - not when a single thread accesses different locations
+  # sequentially. Here, each thread reads two values with a fixed stride between them.
   var sum: int32 = 0
   while globalIdx < n:
     # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
@@ -32,7 +35,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     if localIdx < stride:
       # echo "Final reduction ", localIdx, " + ", localIdx + stride
       smem[localIdx] += smem[localIdx + stride]
-    wait barrier # was memoryBarrierShared
+    wait barrier # was memoryBarrierShared();barrier();
     stride = stride div 2
 
   # Final reduction within each subgroup
