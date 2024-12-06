@@ -1,4 +1,5 @@
 # https://www.youtube.com/playlist?list=PLxNPSjHT5qvtYRVdNN1yDcdSl39uHV_sU
+# https://www.youtube.com/watch?v=voFt2e2QXtA
 # https://medium.com/better-programming/optimizing-parallel-reduction-in-metal-for-apple-m1-8e8677b49b01
 # https://moderngpu.github.io/scan.html
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1` and
