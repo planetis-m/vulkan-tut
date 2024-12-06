@@ -39,7 +39,8 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   if localIdx == 0:
     unprotected buffers as b:
-      b.output[groupIdx] = smem.buffer[0]
+      b.output[groupIdx] =
+        (if groupIdx > 0: smem.buffer[0] + b.output[groupIdx - 1] else: smem.buffer[0])
 
 # Main
 const
@@ -69,7 +70,7 @@ proc main =
     reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements, coerseFactor)
 
   unprotected buffers as b:
-    let result = sum(b.output)
+    let result = b.output[^1]
     let expected = (numElements - 1)*numElements div 2
     echo "Reduction result: ", result, ", expected: ", expected
 
