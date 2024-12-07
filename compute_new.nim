@@ -17,8 +17,7 @@ proc updateUniformBuffer(device: VkDevice, memory: VkDeviceMemory, data: pointer
 
 proc fetchRenderedImage(device: VkDevice, memory: VkDeviceMemory,
                         size: VkDeviceSize): seq[ColorRGBA] =
-  let mappedMemory = mapMemory(device, memory, 0.VkDeviceSize, size,
-                               0.VkMemoryMapFlags)
+  let mappedMemory = mapMemory(device, memory, 0.VkDeviceSize, size, 0.VkMemoryMapFlags)
   let data = cast[ptr UncheckedArray[Color]](mappedMemory)
   result = newSeq[ColorRGBA](size.int div sizeof(Color))
   # Transform data from [0.0f, 1.0f] (float) to [0, 255] (uint8).

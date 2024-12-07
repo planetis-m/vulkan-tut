@@ -44,8 +44,8 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
       if groupIdx > 0:
         while true:
           if load(b.status[groupIdx - 1]) == 1: break
-      let previous = if groupIdx > 0: b.output[env.gl_NumWorkGroups.x - groupIdx] else: 0
-      b.output[env.gl_NumWorkGroups.x - groupIdx - 1] = smem.buffer[0] + previous
+      let previous = if groupIdx > 0: b.output[groupIdx - 1] else: 0
+      b.output[groupIdx] = smem.buffer[0] + previous
       store(b.status[groupIdx], 1) # Mark this group as complete
 
 # Main
@@ -77,7 +77,7 @@ proc main =
     reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements, coerseFactor)
 
   unprotected buffers as b:
-    let result = b.output[0]
+    let result = b.output[^1]
     let expected = (numElements - 1)*numElements div 2
     echo "Reduction result: ", result, ", expected: ", expected
 
