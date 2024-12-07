@@ -45,6 +45,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
       while load(b.status[groupIdx]) == 0: discard
       let previous = b.output[groupIdx]
       b.output[groupIdx + 1] = smem.buffer[0] + previous
+      fence() # Memory fence
       store(b.status[groupIdx + 1], 1) # Mark this group as complete
 
 # Main
