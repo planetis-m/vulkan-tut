@@ -16,10 +16,10 @@ layout(std430, binding = 2) buffer PartialSums {
 };
 
 void main() {
-  uint globalIndex = gl_GlobalInvocationID.x;
-  uint groupIndex = gl_WorkGroupID.x;
+  uint globalIdx = gl_GlobalInvocationID.x;
+  uint groupIdx = gl_WorkGroupID.x;
 
-  if (globalIndex < arraySize && groupIndex > 0) {
-    outputData[globalIndex] += partialSums[isExclusive != 0u ? groupIndex : groupIndex - 1];
+  if (globalIdx < arraySize && groupIdx > 0) {
+    outputData[globalIdx] += partialSums[isExclusive != 0u ? groupIdx : groupIdx - 1];
   }
 }

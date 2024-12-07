@@ -21,22 +21,22 @@ layout(std430, binding = 2) buffer PartialSums {
 };
 
 void main() {
-  uint localIndex = gl_LocalInvocationID.x;
+  uint localIdx = gl_LocalInvocationID.x;
   uint localSize = gl_WorkGroupSize.x
-  uint groupIndex = gl_WorkGroupID.x;
-  uint globalIndex = groupIndex * localSize * coerseFactor + localIndex;
+  uint groupIdx = gl_WorkGroupID.x;
+  uint globalIdx = groupIdx * localSize * coerseFactor + localIdx;
 
-  if (groupIndex > 0) {
-    float partialSum = partialSums[isExclusive != 0u ? groupIndex : groupIndex - 1];
+  if (groupIdx > 0) {
+    float partialSum = partialSums[isExclusive != 0u ? groupIdx : groupIdx - 1];
     for (uint tile = 0; tile < coerseFactor; tile++) {
 #if !BOUNDS_CHECK
-      outputData[globalIndex] += partialSum;
+      outputData[globalIdx] += partialSum;
 #else
-      if (globalIndex < arraySize) {
-        outputData[globalIndex] += partialSum;
+      if (globalIdx < arraySize) {
+        outputData[globalIdx] += partialSum;
       }
 #endif
-      globalIndex += localSize;
+      globalIdx += localSize;
     }
   }
 }

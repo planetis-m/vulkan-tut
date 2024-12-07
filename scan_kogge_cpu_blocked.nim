@@ -3,7 +3,6 @@
 # https://www.youtube.com/watch?v=-eoUw8fTy2E
 # https://www.youtube.com/watch?v=CcwdWP44aFE
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1`
-
 import emulate_device, std/math, malebolgia, malebolgia/lockers
 
 proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,

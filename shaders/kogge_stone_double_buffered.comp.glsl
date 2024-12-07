@@ -1,4 +1,4 @@
-#version 430
+#version 450
 
 layout(local_size_x_id = 0) in;
 layout(constant_id = 0) const uint SECTION_SIZE = 32;
