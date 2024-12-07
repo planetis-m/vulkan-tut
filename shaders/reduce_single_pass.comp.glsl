@@ -23,8 +23,11 @@ layout(std140, binding = 2) uniform UniformBlock {
   uint coerseFactor;
 };
 
-layout(std430, binding = 3) buffer ControlBuffer {
+layout(std430, binding = 3) buffer GlobalCounter {
   uint globalID;
+};
+
+layout(std430, binding = 4) buffer StatusBuffer {
   uint groupStatus[];
 };
 
@@ -36,7 +39,6 @@ void main() {
     blockID = atomicAdd(globalID, 1);
   }
   memoryBarrierShared();
-  barrier();
 
   uint groupIdx = blockID;
   uint localSize = gl_WorkGroupSize.x;
