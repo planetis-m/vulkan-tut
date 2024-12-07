@@ -8,7 +8,7 @@ layout(local_size_x_id = 0) in;
 
 layout(constant_id = 0) const uint SHARED_SIZE = 32;
 shared int sharedData[SHARED_SIZE];
-shared uint blockID;
+shared uint localCount;
 
 layout(std430, binding = 0) buffer InputBuffer {
   int inputData[];
@@ -24,7 +24,7 @@ layout(std140, binding = 2) uniform UniformBlock {
 };
 
 layout(std430, binding = 3) buffer GlobalCounter {
-  uint globalID;
+  uint globalCount;
 };
 
 layout(std430, binding = 4) buffer StatusBuffer {
@@ -36,14 +36,14 @@ void main() {
 
   // Dynamic block numbering
   if (localIdx == 0) {
-    blockID = atomicAdd(globalID, 1);
+    localCount = atomicAdd(globalCount, 1);
   }
   memoryBarrierShared();
   barrier();
 
-  uint groupIdx = blockID;
+  uint groupIdx = localCount;
   uint localSize = gl_WorkGroupSize.x;
-  uint globalIdx = blockID * localSize * 2 * coerseFactor + localIdx;
+  uint globalIdx = groupIdx * localSize * 2 * coerseFactor + localIdx;
 
   int sum = 0;
   uint baseIdx = globalIdx;
@@ -96,13 +96,12 @@ void main() {
   }
 
   if (localIdx == 0) {
-    if (groupIdx > 0) {
-      while (atomicLoad(groupStatus[blockID - 1]) == 0) {
-        // Active wait until the previous group signals completion
-      }
+    while (atomicLoad(groupStatus[blockID]) == 0) {
+      // Active wait until the previous group signals completion
     }
-    int previous = (groupIdx > 0) ? outputData[groupIdx - 1] : 0;
-    outputData[groupIdx] = sharedData[0] + previous;
-    atomicStore(groupStatus[blockID], 1); // Signal completion
+    int previous = outputData[groupIdx]
+    outputData[groupIdx + 1] = sharedData[0] + previous;
+    memoryBarrierBuffer(); // Memory fence
+    atomicStore(groupStatus[blockID + 1], 1); // Signal completion
   }
 }

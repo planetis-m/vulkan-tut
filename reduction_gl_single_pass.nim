@@ -47,19 +47,24 @@ proc initResources(): Reduction =
     inputDataPtr[i] = 1
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Output buffer
-  let zeros: int32 = 0
-  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(zeros), addr zeros, GL_STATIC_DRAW)
+  result.outputBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, (NumWorkGroups + 1)*sizeof(int32), nil, GL_STATIC_DRAW)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.outputBuffer)
+  let ouputDataPtr = cast[ptr UncheckedArray[int32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  zeroMem(ouputDataPtr, sizeof(uint32)*(NumWorkGroups + 1))
+  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
   # Uniform buffer
   var uniform: uint32 = NumElements
   result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uniform), addr uniform, GL_DYNAMIC_DRAW)
   # Counter buffer
+  let zeros: uint32 = 0
   result.counterBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(zeros), addr zeros, GL_STATIC_DRAW)
   # Status buffer
-  result.statusBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(uint32), nil, GL_STATIC_DRAW)
+  result.statusBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, (NumWorkGroups + 1)*sizeof(uint32), nil, GL_STATIC_DRAW)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.statusBuffer)
   # Zero initialize the buffer
   let statusDataPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
-  zeroMem(statusDataPtr, sizeof(uint32) * NumWorkGroups)
+  statusDataPtr[0] = 1
+  zeroMem(addr statusDataPtr[1], sizeof(uint32)*NumWorkGroups)
   discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 proc dispatchComputeShader(resources: Reduction) =

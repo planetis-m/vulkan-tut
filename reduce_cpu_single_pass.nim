@@ -7,17 +7,17 @@ import emulate_device, std/[atomics, math], malebolgia, malebolgia/lockers
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output: seq[int32];
                                            status: seq[Atomic[uint32]];
-                                           globalId: Atomic[uint]]],
-                     smem: ptr tuple[buffer: seq[int32], localId: uint],
+                                           globalCount: Atomic[uint]]],
+                     smem: ptr tuple[buffer: seq[int32], localCount: uint],
                      n, coerseFactor: uint) {.gcsafe.} =
   # Dynamic block numbering
   let localIdx = env.gl_LocalInvocationID.x
   if localIdx == 0:
     unprotected buffers as b:
-      smem.localId = fetchAdd(b.globalId, 1)
+      smem.localCount = fetchAdd(b.globalCount, 1)
   wait barrier
 
-  let groupIdx = smem.localId
+  let groupIdx = smem.localCount
   let localSize = env.gl_WorkGroupSize.x
   var globalIdx = groupIdx * localSize * 2 * coerseFactor + localIdx
 
@@ -41,12 +41,11 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   if localIdx == 0:
     unprotected buffers as b:
-      if groupIdx > 0:
-        while true:
-          if load(b.status[groupIdx - 1]) == 1: break
-      let previous = if groupIdx > 0: b.output[groupIdx - 1] else: 0
-      b.output[groupIdx] = smem.buffer[0] + previous
-      store(b.status[groupIdx], 1) # Mark this group as complete
+      # Active wait until the previous group signals completion
+      while load(b.status[groupIdx]) == 0: discard
+      let previous = b.output[groupIdx]
+      b.output[groupIdx + 1] = smem.buffer[0] + previous
+      store(b.status[groupIdx + 1], 1) # Mark this group as complete
 
 # Main
 const
@@ -67,12 +66,15 @@ proc main =
 
   var buffers = initLocker (
     input: ensureMove(inputData),
-    output: newSeq[int32](numWorkGroups.x),
-    status: newSeq[Atomic[uint32]](numWorkGroups.x),
-    globalId: default(Atomic[uint])
+    output: newSeq[int32](numWorkGroups.x + 1),
+    status: newSeq[Atomic[uint32]](numWorkGroups.x + 1),
+    globalCount: default(Atomic[uint])
   )
 
-  # Run the compute shader on CPU, pass buffers and normals as parameters.
+  unprotected buffers as b:
+    b.status[0].store(1)
+
+  # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, (newSeq[int32](workGroupSize.x), 0'u)):
     reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements, coerseFactor)
 
