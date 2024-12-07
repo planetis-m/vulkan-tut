@@ -94,7 +94,7 @@ proc main =
     partialSums: newSeq[int32](numWorkGroups.x)
   )
 
-  # Run the compute shader on CPU, pass buffers and normals as parameters.
+  # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
     prefixSumShader(env, barrier.getHandle(), buffers, addr shared, numElements, isExclusive)
 

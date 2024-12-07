@@ -10,7 +10,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                                            globalId: Atomic[uint]]],
                      smem: ptr tuple[buffer: seq[int32], localId: uint],
                      n, coerseFactor: uint) {.gcsafe.} =
-
+  # Dynamic block numbering
   let localIdx = env.gl_LocalInvocationID.x
   if localIdx == 0:
     unprotected buffers as b:
