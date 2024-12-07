@@ -11,11 +11,14 @@ layout(std430, binding = 0) buffer InputBuffer {
 
 layout(std430, binding = 1) buffer OutputBuffer {
   int outputData;
-  uint lock;
 };
 
-layout(set = 0, binding = 2) uniform UniformBlock {
+layout(std140, binding = 2) uniform UniformBlock {
   uint n;
+};
+
+layout(std430, binding = 3) buffer LockBuffer {
+  uint lock;
 };
 
 void main() {

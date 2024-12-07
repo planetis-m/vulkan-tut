@@ -13,13 +13,15 @@ type
     inputBuffer: GLuint
     outputBuffer: GLuint
     uniformBuffer: GLuint
-    lockBuffer: GLuint
+    counterBuffer: GLuint
+    statusBuffer: GLuint
 
 proc cleanup(x: Reduction) =
   glDeleteBuffers(1, addr x.inputBuffer)
   glDeleteBuffers(1, addr x.outputBuffer)
   glDeleteBuffers(1, addr x.uniformBuffer)
-  glDeleteBuffers(1, addr x.lockBuffer)
+  glDeleteBuffers(1, addr x.counterBuffer)
+  glDeleteBuffers(1, addr x.statusBuffer)
   glDeleteProgram(x.program)
 
 proc initOpenGLContext() =
@@ -50,8 +52,15 @@ proc initResources(): Reduction =
   # Uniform buffer
   var uniform: uint32 = NumElements
   result.uniformBuffer = createGPUBuffer(GL_UNIFORM_BUFFER, sizeof(uniform), addr uniform, GL_DYNAMIC_DRAW)
-  # Lock buffer
-  result.lockBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(zeros), addr zeros, GL_STATIC_DRAW)
+  # Counter buffer
+  result.counterBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, sizeof(zeros), addr zeros, GL_STATIC_DRAW)
+  # Status buffer
+  result.statusBuffer = createGPUBuffer(GL_SHADER_STORAGE_BUFFER, NumWorkGroups*sizeof(uint32), nil, GL_STATIC_DRAW)
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.statusBuffer)
+  # Zero initialize the buffer
+  let statusDataPtr = cast[ptr UncheckedArray[uint32]](glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY))
+  zeroMem(statusDataPtr, sizeof(uint32) * NumWorkGroups)
+  discard glUnmapBuffer(GL_SHADER_STORAGE_BUFFER)
 
 proc dispatchComputeShader(resources: Reduction) =
   # Use the program
@@ -60,7 +69,8 @@ proc dispatchComputeShader(resources: Reduction) =
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, resources.inputBuffer)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, resources.outputBuffer)
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, resources.uniformBuffer)
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, resources.lockBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, resources.counterBuffer)
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, resources.statusBuffer)
   profile("Compute shader dispatch"):
     # Dispatch the compute shader
     glDispatchCompute(NumWorkGroups, 1, 1)

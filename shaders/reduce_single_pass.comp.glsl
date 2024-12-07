@@ -39,6 +39,7 @@ void main() {
     blockID = atomicAdd(globalID, 1);
   }
   memoryBarrierShared();
+  barrier();
 
   uint groupIdx = blockID;
   uint localSize = gl_WorkGroupSize.x;
