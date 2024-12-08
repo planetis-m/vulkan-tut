@@ -3,60 +3,82 @@
 # https://www.youtube.com/watch?v=-eoUw8fTy2E
 # https://www.youtube.com/watch?v=CcwdWP44aFE
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1`
+
 import emulate_device, std/math, malebolgia, malebolgia/lockers
 
 proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output, partialSums: seq[int32]]],
-                     smem: ptr seq[int32], n, coerseFactor, isExclusive: uint) {.gcsafe.} =
-  let globalIdx = env.gl_GlobalInvocationID.x
-  let localIdx = env.gl_LocalInvocationID.x
+                     smem: ptr tuple[segment, aggregate: seq[int32]],
+                     n, coerseFactor, isExclusive: uint) {.gcsafe.} =
   let localSize = env.gl_WorkGroupSize.x
   let groupIdx = env.gl_WorkGroupID.x
+  let localIdx = env.gl_LocalInvocationID.x
+  let globalIdx = groupIdx * localSize * coerseFactor + localIdx
 
-  # Load data into shared memory
+  # Load first element into shared memory
   if isExclusive != 0:
     if globalIdx < n and localIdx != 0:
       unprotected buffers as b:
-        smem[localIdx] = b.input[globalIdx - 1]
+        smem.segment[localIdx] = b.input[globalIdx - 1]
     else:
-      smem[localIdx] = 0
+      smem.segment[localIdx] = 0
   else:
     if globalIdx < n:
       unprotected buffers as b:
-        smem[localIdx] = b.input[globalIdx]
+        smem.segment[localIdx] = b.input[globalIdx]
     else:
-      smem[localIdx] = 0
+      smem.segment[localIdx] = 0
+
+  # Initialize indices for subsequent loads
+  var sharedIdx = localIdx + localSize
+  var inputIdx = globalIdx + localSize
+  # Load remaining elements
+  for tile in 1 ..< coerseFactor:
+    unprotected buffers as b:
+      smem.segment[sharedIdx] =
+        (if inputIdx < n: b.input[inputIdx] else: 0)
+    sharedIdx += localSize
+    inputIdx += localSize
 
   # Memory barrier equivalent
   wait barrier
+
+  # Per thread scan
+  let segmentStart = coerseFactor * localIdx
+  for offset in 1 ..< coerseFactor:
+    smem.segment[segmentStart + offset] = smem.segment[segmentStart + offset - 1]
 
   # Kogge-Stone parallel scan
   var stride: uint = 1
   while stride < localSize:
     var currentSum: int32 = 0
     if localIdx >= stride:
-      currentSum = smem[localIdx] + smem[localIdx - stride]
+      currentSum = smem.aggregate[localIdx] + smem.aggregate[localIdx - stride]
 
     wait barrier
 
     if localIdx >= stride:
-      smem[localIdx] = currentSum
+      smem.aggregate[localIdx] = currentSum
 
     wait barrier
     stride *= 2
 
   # Store results and partial sums
   if globalIdx < n:
+    if localIdx > 0:
+      for offset in 1 ..< coerseFactor:
+        smem.segment[segmentStart + offset] = smem.aggregate[segmentStart + offset - 1]
+
     unprotected buffers as b:
-      b.output[globalIdx] = smem[localIdx]
+      b.output[globalIdx] = smem.segment[localIdx]
 
     # Last thread in block stores sum for block-level scan
     if localIdx == localSize - 1:
       unprotected buffers as b:
         if isExclusive != 0:
-          b.partialSums[groupIdx] = smem[localIdx] + b.input[globalIdx]
+          b.partialSums[groupIdx] = smem.aggregate[localIdx] + b.input[globalIdx]
         else:
-          b.partialSums[groupIdx] = smem[localIdx]
+          b.partialSums[groupIdx] = smem.aggregate[localIdx]
 
 proc addShader(env: GlEnvironment, barrier: BarrierHandle,
                buffers: Locker[tuple[input, output, partialSums: seq[int32]]],
@@ -102,17 +124,17 @@ proc main =
   )
 
   # Run the compute shader on CPU, pass buffers as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
-    prefixSumShader(env, barrier.getHandle(), buffers, addr shared,
-                    numElements, coerseFactor, isExclusive)
+  runComputeOnCpu(numWorkGroups, workGroupSize,
+                  (newSeq[int32](workGroupSize.x * coerseFactor), newSeq[int32](workGroupSize.x))):
+    prefixSumShader(env, barrier.getHandle(), buffers, addr shared, numElements,
+                    coerseFactor, isExclusive)
 
   # if gridSize > 1:
   unprotected buffers as b:
     cumsum(b.partialSums)
 
   runComputeOnCpu(numWorkGroups, workGroupSize, 0):
-    addShader(env, barrier.getHandle(), buffers, numElements,
-              coerseFactor, isExclusive)
+    addShader(env, barrier.getHandle(), buffers, numElements, coerseFactor, isExclusive)
 
   unprotected buffers as b:
     let result = b.output[^1]
