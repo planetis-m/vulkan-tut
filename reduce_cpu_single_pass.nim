@@ -9,7 +9,7 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                                            status: seq[Atomic[uint32]];
                                            globalCount: Atomic[uint]]],
                      smem: ptr tuple[buffer: seq[int32], localCount: uint],
-                     n, coerseFactor: uint) {.gcsafe.} =
+                     n, coarseFactor: uint) {.gcsafe.} =
   # Dynamic block numbering
   let localIdx = env.gl_LocalInvocationID.x
   if localIdx == 0:
@@ -19,10 +19,10 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   let groupIdx = smem.localCount
   let localSize = env.gl_WorkGroupSize.x
-  var globalIdx = groupIdx * localSize * 2 * coerseFactor + localIdx
+  var globalIdx = groupIdx * localSize * 2 * coarseFactor + localIdx
 
   var sum: int32 = 0
-  for tile in 0 ..< coerseFactor:
+  for tile in 0 ..< coarseFactor:
     # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     unprotected buffers as b:
       sum += b.input[globalIdx] +
@@ -51,9 +51,9 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 # Main
 const
   numElements = 256
-  coerseFactor = 4
+  coarseFactor = 4
   localSize = 4 # workgroupSize
-  segment = localSize * 2 * coerseFactor
+  segment = localSize * 2 * coarseFactor
 
 proc main =
   # Set the number of work groups and the size of each work group
@@ -77,7 +77,7 @@ proc main =
 
   # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, (newSeq[int32](workGroupSize.x), 0'u)):
-    reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements, coerseFactor)
+    reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements, coarseFactor)
 
   unprotected buffers as b:
     let result = b.output[^1]

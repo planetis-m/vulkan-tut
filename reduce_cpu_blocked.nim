@@ -6,14 +6,14 @@ import emulate_device, std/math, malebolgia, malebolgia/lockers
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output: seq[int32]]],
-                     smem: ptr seq[int32], coerseFactor: uint) {.gcsafe.} =
+                     smem: ptr seq[int32], coarseFactor: uint) {.gcsafe.} =
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
-  var globalIdx = env.gl_WorkGroupID.x * localSize * 2 * coerseFactor + localIdx
+  var globalIdx = env.gl_WorkGroupID.x * localSize * 2 * coarseFactor + localIdx
 
   unprotected buffers as b:
     var sum = b.input[globalIdx]
-  for tile in 1 ..< 2 * coerseFactor:
+  for tile in 1 ..< 2 * coarseFactor:
     # echo "ThreadId ", localIdx, " index: ", globalIdx + tile * localSize
     # if globalIdx + tile.uint * localSize < n:
     unprotected buffers as b:
@@ -39,9 +39,9 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 # Main
 const
   numElements = 256
-  coerseFactor = 4
+  coarseFactor = 4
   localSize = 4 # workgroupSize
-  segment = localSize * 2 * coerseFactor
+  segment = localSize * 2 * coarseFactor
 
 proc main =
   # Set the number of work groups and the size of each work group
@@ -57,7 +57,7 @@ proc main =
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[int32](workGroupSize.x)):
-    reductionShader(env, barrier.getHandle(), buffers, addr shared, coerseFactor)
+    reductionShader(env, barrier.getHandle(), buffers, addr shared, coarseFactor)
 
   unprotected buffers as b:
     let result = sum(b.output)

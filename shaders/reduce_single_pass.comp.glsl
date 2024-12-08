@@ -20,7 +20,7 @@ layout(std430, binding = 1) buffer OutputBuffer {
 
 layout(std140, binding = 2) uniform UniformBlock {
   uint arraySize;
-  uint coerseFactor;
+  uint coarseFactor;
 };
 
 layout(std430, binding = 3) buffer GlobalCounter {
@@ -43,12 +43,12 @@ void main() {
 
   uint groupIdx = localCount;
   uint localSize = gl_WorkGroupSize.x;
-  uint globalIdx = groupIdx * localSize * 2 * coerseFactor + localIdx;
+  uint globalIdx = groupIdx * localSize * 2 * coarseFactor + localIdx;
 
   int sum = 0;
   uint baseIdx = globalIdx;
 
-  for (uint tile = 0; tile < coerseFactor; tile++) {
+  for (uint tile = 0; tile < coarseFactor; tile++) {
 #if !BOUNDS_CHECK
     sum += inputData[baseIdx] + inputData[baseIdx + localSize];
 #else

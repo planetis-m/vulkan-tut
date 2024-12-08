@@ -9,11 +9,11 @@ import emulate_device, std/math, malebolgia, malebolgia/lockers
 proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output, partialSums: seq[int32]]],
                      smem: ptr tuple[segment, aggregate: seq[int32]],
-                     n, coerseFactor, isExclusive: uint) {.gcsafe.} =
+                     n, coarseFactor, isExclusive: uint) {.gcsafe.} =
   let localSize = env.gl_WorkGroupSize.x
   let groupIdx = env.gl_WorkGroupID.x
   let localIdx = env.gl_LocalInvocationID.x
-  let globalIdx = groupIdx * localSize * coerseFactor + localIdx
+  let globalIdx = groupIdx * localSize * coarseFactor + localIdx
 
   # Load first element into shared memory
   if isExclusive != 0:
@@ -33,7 +33,7 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
   var sharedIdx = localIdx + localSize
   var inputIdx = globalIdx + localSize
   # Load remaining elements
-  for tile in 1 ..< coerseFactor:
+  for tile in 1 ..< coarseFactor:
     unprotected buffers as b:
       smem.segment[sharedIdx] =
         (if inputIdx < n: b.input[inputIdx] else: 0)
@@ -44,9 +44,10 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
   wait barrier
 
   # Per thread scan
-  let segmentStart = coerseFactor * localIdx
-  for offset in 1 ..< coerseFactor:
+  let segmentStart = coarseFactor * localIdx
+  for offset in 1 ..< coarseFactor:
     smem.segment[segmentStart + offset] = smem.segment[segmentStart + offset - 1]
+  smem.aggregate[localIdx] = smem.segment[segmentStart + coarseFactor - 1]
 
   # Kogge-Stone parallel scan
   var stride: uint = 1
@@ -66,7 +67,7 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
   # Store results and partial sums
   if globalIdx < n:
     if localIdx > 0:
-      for offset in 1 ..< coerseFactor:
+      for offset in 1 ..< coarseFactor:
         smem.segment[segmentStart + offset] = smem.aggregate[segmentStart + offset - 1]
 
     unprotected buffers as b:
@@ -82,18 +83,18 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
 
 proc addShader(env: GlEnvironment, barrier: BarrierHandle,
                buffers: Locker[tuple[input, output, partialSums: seq[int32]]],
-               n, coerseFactor, isExclusive: uint) =
+               n, coarseFactor, isExclusive: uint) =
 
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
   let groupIdx = env.gl_WorkGroupID.x
-  var globalIdx = groupIdx * localSize * coerseFactor + localIdx
+  var globalIdx = groupIdx * localSize * coarseFactor + localIdx
 
   if groupIdx > 0:
     unprotected buffers as b:
       let partialSum = b.partialSums[
         if isExclusive != 0: groupIdx else: groupIdx - 1]
-    for tile in 0 ..< coerseFactor:
+    for tile in 0 ..< coarseFactor:
       if globalIdx < n:
         unprotected buffers as b:
           b.output[globalIdx] += partialSum
@@ -102,10 +103,10 @@ proc addShader(env: GlEnvironment, barrier: BarrierHandle,
 # Main
 const
   numElements = 253
-  coerseFactor = 4
+  coarseFactor = 4
   localSize = 4 # workgroupSize
   isExclusive = 0
-  segment = localSize * coerseFactor
+  segment = localSize * coarseFactor
 
 proc main =
   # Set the number of work groups and the size of each work group
@@ -125,16 +126,16 @@ proc main =
 
   # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize,
-                  (newSeq[int32](workGroupSize.x * coerseFactor), newSeq[int32](workGroupSize.x))):
+                  (newSeq[int32](workGroupSize.x * coarseFactor), newSeq[int32](workGroupSize.x))):
     prefixSumShader(env, barrier.getHandle(), buffers, addr shared, numElements,
-                    coerseFactor, isExclusive)
+                    coarseFactor, isExclusive)
 
   # if gridSize > 1:
   unprotected buffers as b:
     cumsum(b.partialSums)
 
   runComputeOnCpu(numWorkGroups, workGroupSize, 0):
-    addShader(env, barrier.getHandle(), buffers, numElements, coerseFactor, isExclusive)
+    addShader(env, barrier.getHandle(), buffers, numElements, coarseFactor, isExclusive)
 
   unprotected buffers as b:
     let result = b.output[^1]
