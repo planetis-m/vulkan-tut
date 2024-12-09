@@ -2,14 +2,26 @@
 # `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -d:useMalloc -g`
 # ...and debug with nim-gdb or lldb
 
-import emulate_device_pro, std/[atomics, math], malebolgia, malebolgia/lockers
+import emulate_device_exp, std/[atomics, math], malebolgia, malebolgia/lockers
+
+type
+  Buffers = object
+    input, output: seq[int32]
+    status: seq[Atomic[uint32]]
+    globalCount: Atomic[uint]
+
+  Shared = object
+    buffer: seq[int32]
+    localCount: uint
+
+  Args = object
+    n: uint
+    coarseFactor: uint
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
-                     buffers: Locker[tuple[input, output: seq[int32];
-                                           status: seq[Atomic[uint32]];
-                                           globalCount: Atomic[uint]]],
-                     smem: ptr tuple[buffer: seq[int32], localCount: uint],
-                     n, coarseFactor: uint) {.gcsafe.} =
+                     buffers: Locker[Buffers],
+                     smem: ptr Shared,
+                     args: Args) {.nimcall, gcsafe.} =
   # Dynamic block numbering
   let localIdx = env.gl_LocalInvocationID.x
   if localIdx == 0:
@@ -19,14 +31,14 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   let groupIdx = smem.localCount
   let localSize = env.gl_WorkGroupSize.x
-  var globalIdx = groupIdx * localSize * 2 * coarseFactor + localIdx
+  var globalIdx = groupIdx * localSize * 2 * args.coarseFactor + localIdx
 
   var sum: int32 = 0
-  for tile in 0 ..< coarseFactor:
+  for tile in 0 ..< args.coarseFactor:
     # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     unprotected buffers as b:
       sum += b.input[globalIdx] +
-        (if globalIdx + localSize < n: b.input[globalIdx + localSize] else: 0)
+        (if globalIdx + localSize < args.n: b.input[globalIdx + localSize] else: 0)
     globalIdx += 2 * localSize
   smem.buffer[localIdx] = sum
 
@@ -65,7 +77,7 @@ proc main =
   for i in 0..<numElements:
     inputData[i] = int32(i)
 
-  var buffers = initLocker (
+  var buffers = initLocker Buffers(
     input: ensureMove(inputData),
     output: newSeq[int32](numWorkGroups.x + 1),
     status: newSeq[Atomic[uint32]](numWorkGroups.x + 1),
@@ -76,8 +88,12 @@ proc main =
     b.status[0].store(1)
 
   # Run the compute shader on CPU, pass buffers as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, (newSeq[int32](workGroupSize.x), 0'u)):
-    reductionShader(env, barrier.getHandle(), storage, addr shared, numElements, coarseFactor)
+  runComputeOnCpu[Locker[Buffers], Shared, Args](
+    numWorkGroups, workGroupSize, buffers,
+    Shared(buffer: newSeq[int32](workGroupSize.x), localCount: 0),
+    reductionShader,
+    Args(n: numElements, coarseFactor: coarseFactor)
+  )
 
   unprotected buffers as b:
     let result = b.output[^1]

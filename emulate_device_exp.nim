@@ -95,6 +95,10 @@ proc wait*(m: BarrierHandle) {.inline.} =
 const
   MaxConcurrentWorkGroups {.intdefine.} = 2
 
+proc wrapCompute[A, B, C](env: GlEnvironment, barrier: BarrierHandle, buffers: A,
+    shared: ptr B, args: C, compute: ComputeProc[A, B, C]) {.nimcall, gcsafe.} =
+  compute(env, barrier, buffers, shared, args)
+
 proc workGroupProc[A, B, C](
     wgX, wgY, wgZ: uint,
     ssbo: A,
@@ -105,7 +109,7 @@ proc workGroupProc[A, B, C](
   # Auxiliary proc for work group management
   var env = env # Shadow for modification
   env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-  var localSmem = smem
+  var smem = smem #
 
   var barrier = createBarrier(
     env.gl_WorkGroupSize.x * env.gl_WorkGroupSize.y * env.gl_WorkGroupSize.z)
@@ -121,7 +125,7 @@ proc workGroupProc[A, B, C](
             wgY * env.gl_WorkGroupSize.y + y,
             wgZ * env.gl_WorkGroupSize.z + z
           )
-          master.spawn compute(env, barrier.getHandle(), ssbo, addr localSmem, args)
+          master.spawn wrapCompute(env, barrier.getHandle(), ssbo, addr smem, args, compute)
 
 proc runComputeOnCpu*[A, B, C](
     numWorkGroups, workGroupSize: UVec3,
