@@ -83,30 +83,41 @@ proc getHandle*(b: var Barrier): BarrierHandle {.inline.} =
 proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
 
-template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; smem, compute: untyped) =
+template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; ssbo, smem, compute: untyped) =
   block:
-    var env {.inject.} = GlEnvironment(
+    proc workGroupProc[A, B](wgX, wgY, wgZ: uint; ssbo: A, smem2: B, env: GlEnvironment) {.nimcall.} =
+      # Auxiliary proc for work group management
+      var env {.inject.} = env
+      env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
+      # echo "New workgroup! id ", wgX, ", ", wgY
+      var storage {.inject.} = ssbo
+      var shared {.inject.} = smem2
+
+      var barrier {.inject.} = createBarrier(
+          env.gl_WorkGroupSize.x * env.gl_WorkGroupSize.y * env.gl_WorkGroupSize.z)
+      # Create master for managing threads
+      var master = createMaster(activeProducer = true)
+      master.awaitAll:
+        for z in 0 ..< env.gl_WorkGroupSize.z:
+          for y in 0 ..< env.gl_WorkGroupSize.y:
+            for x in 0 ..< env.gl_WorkGroupSize.x:
+              env.gl_LocalInvocationID = uvec3(x, y, z)
+              env.gl_GlobalInvocationID = uvec3(
+                wgX * env.gl_WorkGroupSize.x + x,
+                wgY * env.gl_WorkGroupSize.y + y,
+                wgZ * env.gl_WorkGroupSize.z + z
+              )
+              master.spawn compute
+
+    let env2 = GlEnvironment(
       gl_NumWorkGroups: numWorkGroups,
       gl_WorkGroupSize: workGroupSize
     )
-    for wgZ in 0 ..< env.gl_NumWorkGroups.z:
-      for wgY in 0 ..< env.gl_NumWorkGroups.y:
-        for wgX in 0 ..< env.gl_NumWorkGroups.x:
-          env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-          # echo "New workgroup! id ", wgX, ", ", wgY
-          var shared {.inject.} = smem
-
-          var barrier {.inject.} = createBarrier(
-            env.gl_WorkGroupSize.x * env.gl_WorkGroupSize.y * env.gl_WorkGroupSize.z)
-          var master = createMaster(activeProducer = true)
-          master.awaitAll:
-            for z in 0 ..< env.gl_WorkGroupSize.z:
-              for y in 0 ..< env.gl_WorkGroupSize.y:
-                for x in 0 ..< env.gl_WorkGroupSize.x:
-                  env.gl_LocalInvocationID = uvec3(x, y, z)
-                  env.gl_GlobalInvocationID = uvec3(
-                    wgX * env.gl_WorkGroupSize.x + x,
-                    wgY * env.gl_WorkGroupSize.y + y,
-                    wgZ * env.gl_WorkGroupSize.z + z
-                  )
-                  master.spawn compute
+    # Create master for managing work groups
+    var master = createMaster(activeProducer = true)
+    var smem2 = smem
+    master.awaitAll:
+      for wgZ in 0 ..< env2.gl_NumWorkGroups.z:
+        for wgY in 0 ..< env2.gl_NumWorkGroups.y:
+          for wgX in 0 ..< env2.gl_NumWorkGroups.x:
+            master.spawn workGroupProc(wgX, wgY, wgZ, ssbo, smem2, env2)

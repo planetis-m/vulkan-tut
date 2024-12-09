@@ -1,5 +1,3 @@
-# https://www.youtube.com/watch?v=1DBsJHVqgS0
-# https://www.youtube.com/watch?v=DrD3eIw74RY
 # https://www.youtube.com/watch?v=-eoUw8fTy2E
 # https://www.youtube.com/watch?v=CcwdWP44aFE
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1`
@@ -32,11 +30,12 @@ proc prefixSumShader(env: GlEnvironment, barrier: BarrierHandle,
   # Initialize indices for subsequent loads
   var sharedIdx = localIdx + localSize
   var inputIdx = globalIdx + localSize
+  let scanOffset = isExclusive  # 1 for exclusive scan, 0 for inclusive
   # Load remaining elements
   for tile in 1 ..< coarseFactor:
     unprotected buffers as b:
       smem.segment[sharedIdx] =
-        (if inputIdx < n: b.input[inputIdx] else: 0)
+        (if inputIdx < n: b.input[inputIdx - scanOffset] else: 0)
     sharedIdx += localSize
     inputIdx += localSize
 
