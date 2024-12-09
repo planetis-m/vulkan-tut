@@ -1,4 +1,4 @@
-# Compile with at least `-d:ThreadPoolSize=(MaxConcurrentWorkGroups+1)*
+# Compile with at least `-d:ThreadPoolSize=MaxConcurrentWorkGroups*
 # (workgroupSizeX*workgroupSizeY*workgroupSizeZ+1)`
 
 ## ## Description
@@ -130,7 +130,7 @@ template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; ssbo, smem, compu
       var wgY: uint = 0
       var wgZ: uint = 0
       # Create master for managing work groups
-      var master = createMaster(activeProducer = true)
+      var master = createMaster(activeProducer = false) # not synchronized
       master.awaitAll:
         while currentGroup < endGroup:
           master.spawn workGroupProc(wgX, wgY, wgZ, ssbo, smem2, env2)
