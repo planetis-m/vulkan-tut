@@ -1,4 +1,5 @@
-# Compile with at least `-d:ThreadPoolSize=workgroupSizeX*workgroupSizeY*workgroupSizeZ+1`
+# Compile with at least `-d:ThreadPoolSize=(MaxConcurrentWorkGroups+1)*
+# (workgroupSizeX*workgroupSizeY*workgroupSizeZ+1)`
 
 ## ## Description
 ##
@@ -54,7 +55,7 @@
 ## | `threadIdx` | `gl_LocalInvocationID` | The index of the current thread within its block (CUDA) or work group (GLSL) |
 ## | `blockIdx * blockDim + threadIdx` | `gl_GlobalInvocationID` | The global index of the current thread (CUDA) or invocation (GLSL) |
 
-import threading/barrier, malebolgia
+import threading/barrier, malebolgia, std/math
 
 type
   UVec3* = object
@@ -82,6 +83,9 @@ proc getHandle*(b: var Barrier): BarrierHandle {.inline.} =
 
 proc wait*(m: BarrierHandle) {.inline.} =
   wait(m.x[])
+
+const
+  MaxConcurrentWorkGroups {.intdefine.} = 2
 
 template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; ssbo, smem, compute: untyped) =
   block:
@@ -113,11 +117,29 @@ template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; ssbo, smem, compu
       gl_NumWorkGroups: numWorkGroups,
       gl_WorkGroupSize: workGroupSize
     )
-    # Create master for managing work groups
-    var master = createMaster(activeProducer = true)
     var smem2 = smem
-    master.awaitAll:
-      for wgZ in 0 ..< env2.gl_NumWorkGroups.z:
-        for wgY in 0 ..< env2.gl_NumWorkGroups.y:
-          for wgX in 0 ..< env2.gl_NumWorkGroups.x:
-            master.spawn workGroupProc(wgX, wgY, wgZ, ssbo, smem2, env2)
+
+    let totalGroups = env2.gl_NumWorkGroups.x * env2.gl_NumWorkGroups.y * env2.gl_NumWorkGroups.z
+    let numBatches = ceilDiv(totalGroups, MaxConcurrentWorkGroups)
+    var currentGroup = 0
+    # Process workgroups in batches to limit concurrent execution
+    for batch in 0 ..< numBatches:
+      let endGroup = min(currentGroup + MaxConcurrentWorkGroups, totalGroups.int)
+      # Initialize workgroup coordinates
+      var wgX: uint = 0
+      var wgY: uint = 0
+      var wgZ: uint = 0
+      # Create master for managing work groups
+      var master = createMaster(activeProducer = true)
+      master.awaitAll:
+        while currentGroup < endGroup:
+          master.spawn workGroupProc(wgX, wgY, wgZ, ssbo, smem2, env2)
+          # Increment coordinates, wrapping when needed
+          inc wgX
+          if wgX >= env2.gl_NumWorkGroups.x:
+            wgX = 0
+            inc wgY
+            if wgY >= env2.gl_NumWorkGroups.y:
+              wgY = 0
+              inc wgZ
+          inc currentGroup

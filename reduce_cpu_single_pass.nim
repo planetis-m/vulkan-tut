@@ -2,7 +2,7 @@
 # `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -d:useMalloc -g`
 # ...and debug with nim-gdb or lldb
 
-import emulate_device, std/[atomics, math], malebolgia, malebolgia/lockers
+import emulate_device_pro, std/[atomics, math], malebolgia, malebolgia/lockers
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
                      buffers: Locker[tuple[input, output: seq[int32];
@@ -76,8 +76,8 @@ proc main =
     b.status[0].store(1)
 
   # Run the compute shader on CPU, pass buffers as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, (newSeq[int32](workGroupSize.x), 0'u)):
-    reductionShader(env, barrier.getHandle(), buffers, addr shared, numElements, coarseFactor)
+  runComputeOnCpu(numWorkGroups, workGroupSize, buffers, (newSeq[int32](workGroupSize.x), 0'u)):
+    reductionShader(env, barrier.getHandle(), storage, addr shared, numElements, coarseFactor)
 
   unprotected buffers as b:
     let result = b.output[^1]
