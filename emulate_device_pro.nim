@@ -122,13 +122,13 @@ template runComputeOnCpu*(numWorkGroups, workGroupSize: UVec3; ssbo, smem, compu
     let totalGroups = env2.gl_NumWorkGroups.x * env2.gl_NumWorkGroups.y * env2.gl_NumWorkGroups.z
     let numBatches = ceilDiv(totalGroups, MaxConcurrentWorkGroups)
     var currentGroup = 0
+    # Initialize workgroup coordinates
+    var wgX: uint = 0
+    var wgY: uint = 0
+    var wgZ: uint = 0
     # Process workgroups in batches to limit concurrent execution
     for batch in 0 ..< numBatches:
       let endGroup = min(currentGroup + MaxConcurrentWorkGroups, totalGroups.int)
-      # Initialize workgroup coordinates
-      var wgX: uint = 0
-      var wgY: uint = 0
-      var wgZ: uint = 0
       # Create master for managing work groups
       var master = createMaster(activeProducer = false) # not synchronized
       master.awaitAll:
