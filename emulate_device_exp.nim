@@ -124,11 +124,11 @@ proc workGroupProc[A, B, C](
     wgX, wgY, wgZ: uint,
     env: GlEnvironment,
     compute: ComputeProc[A, B, C],
-    ssbo: A, smem: B, args: C) {.nimcall.} =
+    ssbo: A, smem: ptr B, args: C) {.nimcall.} =
   # Auxiliary proc for work group management
   var env = env # Shadow for modification
   env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-  var smem = smem # Allocated per work group
+  var smem = smem[] # Allocated per work group
 
   var barrier = createBarrier(
     env.gl_WorkGroupSize.x * env.gl_WorkGroupSize.y * env.gl_WorkGroupSize.z)
@@ -149,7 +149,7 @@ proc workGroupProc[A, B, C](
 proc runComputeOnCpu*[A, B, C](
     numWorkGroups, workGroupSize: UVec3,
     compute: ComputeProc[A, B, C],
-    ssbo: A, smem: sink B, args: C) =
+    ssbo: A, smem: B, args: C) =
   let env = GlEnvironment(
     gl_NumWorkGroups: numWorkGroups,
     gl_WorkGroupSize: workGroupSize
@@ -166,7 +166,7 @@ proc runComputeOnCpu*[A, B, C](
     var master = createMaster(activeProducer = false)
     master.awaitAll:
       while currentGroup < endGroup:
-        master.spawn workGroupProc(wgX, wgY, wgZ, env, compute, ssbo, smem, args)
+        master.spawn workGroupProc(wgX, wgY, wgZ, env, compute, ssbo, addr smem, args)
         # Increment coordinates, wrapping when needed
         inc wgX
         if wgX >= env.gl_NumWorkGroups.x:

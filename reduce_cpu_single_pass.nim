@@ -14,14 +14,13 @@ type
     buffer: seq[int32]
     localCount: uint
 
-  Args = object
+  Args = tuple
     n: uint
     coarseFactor: uint
 
 proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
-                     b: ptr Buffers,
-                     smem: ptr Shared,
-                     args: Args) =
+                     b: ptr Buffers, smem: ptr Shared, args: Args) =
+  let (n, coarseFactor) = args
   # Dynamic block numbering
   let localIdx = env.gl_LocalInvocationID.x
   if localIdx == 0:
@@ -30,13 +29,13 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
   let groupIdx = smem.localCount
   let localSize = env.gl_WorkGroupSize.x
-  var globalIdx = groupIdx * localSize * 2 * args.coarseFactor + localIdx
+  var globalIdx = groupIdx * localSize * 2 * coarseFactor + localIdx
 
   var sum: int32 = 0
-  for tile in 0 ..< args.coarseFactor:
+  for tile in 0 ..< coarseFactor:
     # echo "ThreadId ", localIdx, " indices: ", globalIdx, " + ", globalIdx + localSize
     sum += b.input[globalIdx] +
-      (if globalIdx + localSize < args.n: b.input[globalIdx + localSize] else: 0)
+      (if globalIdx + localSize < n: b.input[globalIdx + localSize] else: 0)
     globalIdx += 2 * localSize
   smem.buffer[localIdx] = sum
 
@@ -59,14 +58,14 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
 
 # Main
 const
-  numElements = 256
-  coarseFactor = 4
-  localSize = 4 # workgroupSize
+  numElements = 256u
+  coarseFactor = 4u
+  localSize = 4u # workgroupSize
   segment = localSize * 2 * coarseFactor
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceilDiv(numElements, segment).uint, 1, 1)
+  let numWorkGroups = uvec3(ceilDiv(numElements, segment), 1, 1)
   let workGroupSize = uvec3(localSize, 1, 1)
 
   # Fill the input buffer
@@ -86,7 +85,7 @@ proc main =
   # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, reductionShader,
     addr buffers, Shared(buffer: newSeq[int32](workGroupSize.x), localCount: 0),
-    Args(n: numElements, coarseFactor: coarseFactor)
+    (numElements, coarseFactor)
   )
 
   let result = buffers.output[^1]

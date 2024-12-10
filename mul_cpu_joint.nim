@@ -3,28 +3,28 @@
 # https://github.com/cwpearson/nvidia-performance-tools
 # https://siboehm.com/articles/22/CUDA-MMM
 
-import emulate_device_exp, fieldutils, malebolgia, std/[math, strutils]
+import emulate_device_exp, malebolgia, std/[math, strutils]
 
 type
-  Args = object
-    M, K, N: int
-    tileSizeA, tileSizeB: int
-    tileSizeRatio: int
+  Args = tuple
+    M, K, N: uint
+    tileSizeA, tileSizeB: uint
+    tileSizeRatio: uint
 
 proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     b: ptr tuple[A, B, C: seq[float32]];
                     sharedB: ptr seq[float32]; args: Args) {.gcsafe.} =
-  (M, K, N, tileSizeA, tileSizeB, tileSizeRatio) <- args
-  let row = env.gl_WorkGroupID.x.int * env.gl_WorkGroupSize.x.int + env.gl_LocalInvocationID.x.int
-  let col = env.gl_WorkGroupID.y.int * tileSizeB
+  let (M, K, N, tileSizeA, tileSizeB, tileSizeRatio) = args
+  let row = env.gl_WorkGroupID.x * env.gl_WorkGroupSize.x + env.gl_LocalInvocationID.x
+  let col = env.gl_WorkGroupID.y * tileSizeB
 
   var cReg = newSeq[float32](tileSizeB)
   # for i in 0..<tileSizeB:
   #   cReg[i] = 0
-  for tileIndex in countup(0, ceilDiv(K, tileSizeRatio)):
+  for tileIndex in countup(0u, ceilDiv(K, tileSizeRatio)):
     # Load tiles into shared memory
-    let i = env.gl_LocalInvocationID.x.int div tileSizeB
-    let j = env.gl_LocalInvocationID.x.int mod tileSizeB
+    let i = env.gl_LocalInvocationID.x div tileSizeB
+    let j = env.gl_LocalInvocationID.x mod tileSizeB
     if col + j < N and (tileIndex * tileSizeRatio + i) < K:
       sharedB[i * tileSizeB + j] = b.B[(tileIndex * tileSizeRatio + i) * N + col + j]
     else:
@@ -48,17 +48,17 @@ proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
 
 # Main
 const
-  M = 64
-  K = 16
-  N = 32
+  M = 64u
+  K = 16u
+  N = 32u
 
-  tileSizeA = 8
-  tileSizeB = 2
+  tileSizeA = 8u
+  tileSizeB = 2u
   tileSizeRatio = tileSizeA div tileSizeB
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceilDiv(M, tileSizeA).uint, ceilDiv(N, tileSizeB).uint, 1)
+  let numWorkGroups = uvec3(ceilDiv(M, tileSizeA), ceilDiv(N, tileSizeB), 1)
   let workGroupSize = uvec3(tileSizeA, 1, 1)
 
   # Initialize the matrices
@@ -75,7 +75,7 @@ proc main =
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, multiplyShader,
     addr buffers, newSeq[float32](tileSizeRatio * tileSizeB),
-    Args^(M, K, N, tileSizeA, tileSizeB, tileSizeRatio))
+    (M, K, N, tileSizeA, tileSizeB, tileSizeRatio))
 
   # Verify the result
   for i in 0..<M:
