@@ -4,12 +4,17 @@
 # https://www.youtube.com/watch?v=CcwdWP44aFE
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1`
 
-import emulate_device, std/math, malebolgia, malebolgia/lockers
+import emulate_device_exp, std/math, malebolgia
+
+type
+  Args = tuple
+    n, isExclusive: uint
 
 proc prefixSumShaderDoubleBuffered(
     env: GlEnvironment, barrier: BarrierHandle,
-    buffers: Locker[tuple[input, output, partialSums: seq[int32]]],
-    smem: ptr tuple[sharedA, sharedB: seq[int32]], n, isExclusive: uint) {.gcsafe.} =
+    b: ptr tuple[input, output, partialSums: seq[int32]],
+    smem: ptr tuple[sharedA, sharedB: seq[int32]], args: Args) {.gcsafe.} =
+  let (n, isExclusive) = args
   let globalIdx = env.gl_GlobalInvocationID.x
   let localIdx = env.gl_LocalInvocationID.x
   let localSize = env.gl_WorkGroupSize.x
@@ -18,14 +23,12 @@ proc prefixSumShaderDoubleBuffered(
   # Load data into shared memory A
   if isExclusive != 0:
     if globalIdx < n and localIdx != 0:
-      unprotected buffers as b:
-        smem.sharedA[localIdx] = b.input[globalIdx - 1]
+      smem.sharedA[localIdx] = b.input[globalIdx - 1]
     else:
       smem.sharedA[localIdx] = 0
   else:
     if globalIdx < n:
-      unprotected buffers as b:
-        smem.sharedA[localIdx] = b.input[globalIdx]
+      smem.sharedA[localIdx] = b.input[globalIdx]
     else:
       smem.sharedA[localIdx] = 0
 
@@ -54,19 +57,19 @@ proc prefixSumShaderDoubleBuffered(
   if globalIdx < n:
     let result = if useA: smem.sharedA[localIdx] else: smem.sharedB[localIdx]
 
-    unprotected buffers as b:
-      b.output[globalIdx] = result
+    b.output[globalIdx] = result
 
-      # Last thread in block stores sum for block-level scan
-      if localIdx == localSize - 1:
-        if isExclusive != 0:
-          b.partialSums[groupIdx] = result + b.input[globalIdx]
-        else:
-          b.partialSums[groupIdx] = result
+    # Last thread in block stores sum for block-level scan
+    if localIdx == localSize - 1:
+      if isExclusive != 0:
+        b.partialSums[groupIdx] = result + b.input[globalIdx]
+      else:
+        b.partialSums[groupIdx] = result
 
 proc addShader(env: GlEnvironment, barrier: BarrierHandle,
-               buffers: Locker[tuple[input, output, partialSums: seq[int32]]],
-               n, isExclusive: uint) =
+               b: ptr tuple[input, output, partialSums: seq[int32]],
+               smem: ptr uint, args: Args) =
+  let (n, isExclusive) = args
   let globalIdx = env.gl_GlobalInvocationID.x
   let groupIdx = env.gl_WorkGroupID.x
 
@@ -74,18 +77,17 @@ proc addShader(env: GlEnvironment, barrier: BarrierHandle,
     let partialSumIdx = if isExclusive != 0: groupIdx
                         else: groupIdx - 1
 
-    unprotected buffers as b:
-      b.output[globalIdx] += b.partialSums[partialSumIdx]
+    b.output[globalIdx] += b.partialSums[partialSumIdx]
 
 # Main
 const
-  numElements = 256
-  localSize = 4 # workgroupSize
-  isExclusive = 0
+  numElements = 256u
+  localSize = 4u # workgroupSize
+  isExclusive = 0u
 
 proc main =
   # Set the number of work groups and the size of each work group
-  let numWorkGroups = uvec3(ceilDiv(numElements, localSize).uint, 1, 1)
+  let numWorkGroups = uvec3(ceilDiv(numElements, localSize), 1, 1)
   let workGroupSize = uvec3(localSize, 1, 1)
 
   # Fill the input buffer
@@ -93,26 +95,26 @@ proc main =
   for i in 0..<numElements:
     inputData[i] = int32(i)
 
-  var buffers = initLocker (
+  var buffers = (
     input: ensureMove(inputData),
     output: newSeq[int32](numElements),
     partialSums: newSeq[int32](numWorkGroups.x) # gridSize
   )
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, (newSeq[int32](workGroupSize.x), newSeq[int32](workGroupSize.x))):
-    prefixSumShaderDoubleBuffered(env, barrier.getHandle(), buffers, addr shared, numElements, isExclusive)
+  runComputeOnCpu(
+    numWorkGroups, workGroupSize, prefixSumShaderDoubleBuffered,
+    addr buffers, (newSeq[int32](workGroupSize.x), newSeq[int32](workGroupSize.x)),
+    (numElements, isExclusive))
 
   # if gridSize > 1:
-  unprotected buffers as b:
-    cumsum(b.partialSums)
+  cumsum(buffers.partialSums)
 
-  runComputeOnCpu(numWorkGroups, workGroupSize, 0):
-    addShader(env, barrier.getHandle(), buffers, numElements, isExclusive)
+  runComputeOnCpu(
+    numWorkGroups, workGroupSize, addShader, addr buffers, 0, (numElements, isExclusive))
 
-  unprotected buffers as b:
-    let result = b.output[^1]
-    let expected = (numElements - 1)*numElements div 2
-    echo "Prefix sum result: ", result, ", expected: ", expected
+  let result = buffers.output[^1]
+  let expected = (numElements - 1)*numElements div 2
+  echo "Prefix sum result: ", result, ", expected: ", expected
 
 main()
