@@ -149,7 +149,7 @@ proc workGroupProc[A, B, C](
 proc runComputeOnCpu*[A, B, C](
     numWorkGroups, workGroupSize: UVec3,
     compute: ComputeProc[A, B, C],
-    ssbo: A, smem: B, args: C) =
+    ssbo: A, smem: sink B, args: C) =
   let env = GlEnvironment(
     gl_NumWorkGroups: numWorkGroups,
     gl_WorkGroupSize: workGroupSize
