@@ -95,16 +95,16 @@ proc wait*(m: BarrierHandle) {.inline.} =
 const
   MaxConcurrentWorkGroups {.intdefine.} = 2
 
-proc wrapCompute[A, B, C](env: GlEnvironment, barrier: BarrierHandle, buffers: A,
-    shared: ptr B, args: C, compute: ComputeProc[A, B, C]) {.gcsafe.} =
+proc wrapCompute[A, B, C](env: GlEnvironment, barrier: BarrierHandle,
+    compute: ComputeProc[A, B, C], buffers: A, shared: ptr B, args: C) {.gcsafe.} =
   compute(env, barrier, buffers, shared, args)
 
 proc workGroupProc[A, B, C](
     wgX, wgY, wgZ: uint,
-    ssbo: A,
-    smem: B,
     env: GlEnvironment,
     compute: ComputeProc[A, B, C],
+    ssbo: A,
+    smem: B,
     args: C) {.nimcall.} =
   # Auxiliary proc for work group management
   var env = env # Shadow for modification
@@ -125,13 +125,13 @@ proc workGroupProc[A, B, C](
             wgY * env.gl_WorkGroupSize.y + y,
             wgZ * env.gl_WorkGroupSize.z + z
           )
-          master.spawn wrapCompute(env, barrier.getHandle(), ssbo, addr smem, args, compute)
+          master.spawn wrapCompute(env, barrier.getHandle(), compute, ssbo, addr smem, args)
 
 proc runComputeOnCpu*[A, B, C](
     numWorkGroups, workGroupSize: UVec3,
+    compute: ComputeProc[A, B, C],
     ssbo: A,
     smem: B,
-    compute: ComputeProc[A, B, C],
     args: C) =
   let env = GlEnvironment(
     gl_NumWorkGroups: numWorkGroups,
@@ -141,9 +141,7 @@ proc runComputeOnCpu*[A, B, C](
   let numBatches = ceilDiv(totalGroups, MaxConcurrentWorkGroups)
   var currentGroup = 0
   # Initialize workgroup coordinates
-  var wgX: uint = 0
-  var wgY: uint = 0
-  var wgZ: uint = 0
+  var wgX, wgY, wgZ: uint = 0
   # Process workgroups in batches to limit concurrent execution
   for batch in 0 ..< numBatches:
     let endGroup = min(currentGroup + MaxConcurrentWorkGroups, totalGroups.int)
@@ -151,7 +149,7 @@ proc runComputeOnCpu*[A, B, C](
     var master = createMaster(activeProducer = false)
     master.awaitAll:
       while currentGroup < endGroup:
-        master.spawn workGroupProc(wgX, wgY, wgZ, ssbo, smem, env, compute, args)
+        master.spawn workGroupProc(wgX, wgY, wgZ, env, compute, ssbo, smem, args)
         # Increment coordinates, wrapping when needed
         inc wgX
         if wgX >= env.gl_NumWorkGroups.x:
