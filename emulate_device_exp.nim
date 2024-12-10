@@ -3,7 +3,7 @@
 
 ## ## Description
 ##
-## `runComputeOnCpu` is a template that simulates a GPU-like compute environment on the CPU.
+## `runComputeOnCpu` is a function that simulates a GPU-like compute environment on the CPU.
 ## It organizes work into workgroups and invocations, similar to how compute shaders operate
 ## on GPUs.
 ##
@@ -15,34 +15,55 @@
 ##
 ## - `numWorkGroups: UVec3` The number of workgroups in each dimension (x, y, z).
 ## - `workGroupSize: UVec3` The size of each workgroup in each dimension (x, y, z).
-## - `smem: untyped` Defines the shared memory for each workgroup.
-## - `compute: untyped` A call to a compute shader function.
+## - `compute: ComputeProc[A, B, C]` The compute shader procedure to execute.
+## - `ssbo: A` Storage buffer object(s) containing the data to process.
+## - `smem: B` Shared memory for each workgroup.
+## - `args: C` Additional arguments passed to the compute shader.
 ##
 ## ## Compute Function Signature
 ##
-## The function called in the `compute` parameter should have the following signature:
+## The compute shader procedure should have the following signature:
 ##
 ## ```nim
-## proc computeFunction(env: GlEnvironment, barrier: BarrierHandle,
-##                      buffers: Locker[YourBufferType], # either Locker[T] or ptr T
-##                      shared: ptr YourSharedMemoryType, # ditto
-##                      #[ ...additional parameters ]#) {.gcsafe.}
+## proc computeFunction[A, B, C](
+##   env: GlEnvironment,
+##   barrier: BarrierHandle,
+##   buffers: A,     # Storage buffer (typically ptr T or Locker[T])
+##   shared: ptr B,  # Shared memory
+##   args: C         # Additional arguments
+## ) {.nimcall.}
 ## ```
 ##
 ## ## Example
 ##
 ## ```nim
-## proc myComputeShader(env: GlEnvironment, barrier: BarrierHandle,
-##                      buffers: Locker[tuple[input, output: seq[float32]]],
-##                      shared: ptr seq[float32], factor: float32) {.gcsafe.} =
+## type
+##   Buffers = ptr tuple[input, output: seq[float32]]
+##   Shared = seq[float32]
+##   Args = object
+##     factor: int32
+##
+## proc myComputeShader(
+##     env: GlEnvironment,
+##     barrier: BarrierHandle,
+##     buffers: Buffers,
+##     shared: ptr Shared,
+##     args: Args) {.nimcall.} =
 ##   # Computation logic here
 ##
-## let numWorkGroups = uvec3(4, 4, 1)
+## let numWorkGroups = uvec3(4, 1, 1)
 ## let workGroupSize = uvec3(256, 1, 1)
-## var buffers = initLocker (input: newSeq[float32](4096), output: newSeq[float32](4096))
+## var buffers: tuple[input, output: seq[float32]]
+## var numElements = 1024
+## var coarseFactor = 4
 ##
-## runComputeOnCpu(numWorkGroups, workGroupSize, newSeq[float32](256)):
-##   myComputeShader(env, barrier.getHandle(), buffers, addr shared, 2.0f)
+## runComputeOnCpu(
+##   numWorkGroups, workGroupSize,
+##   myComputeShader,
+##   addr buffers,
+##   newSeq[float32](workGroupSize.x),
+##   Args(factor: coarseFactor)
+## )
 ## ```
 ##
 ## ## CUDA to GLSL Translation Table
@@ -103,9 +124,7 @@ proc workGroupProc[A, B, C](
     wgX, wgY, wgZ: uint,
     env: GlEnvironment,
     compute: ComputeProc[A, B, C],
-    ssbo: A,
-    smem: B,
-    args: C) {.nimcall.} =
+    ssbo: A, smem: B, args: C) {.nimcall.} =
   # Auxiliary proc for work group management
   var env = env # Shadow for modification
   env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
@@ -130,9 +149,7 @@ proc workGroupProc[A, B, C](
 proc runComputeOnCpu*[A, B, C](
     numWorkGroups, workGroupSize: UVec3,
     compute: ComputeProc[A, B, C],
-    ssbo: A,
-    smem: B,
-    args: C) =
+    ssbo: A, smem: B, args: C) =
   let env = GlEnvironment(
     gl_NumWorkGroups: numWorkGroups,
     gl_WorkGroupSize: workGroupSize
