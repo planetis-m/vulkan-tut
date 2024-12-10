@@ -77,7 +77,7 @@ type
     buffers: A,
     shared: ptr B,
     args: C
-  ) {.nimcall, gcsafe.}
+  ) {.nimcall.}
 
 proc uvec3*(x, y, z: uint): UVec3 =
   result = UVec3(x: x, y: y, z: z)
@@ -96,7 +96,7 @@ const
   MaxConcurrentWorkGroups {.intdefine.} = 2
 
 proc wrapCompute[A, B, C](env: GlEnvironment, barrier: BarrierHandle, buffers: A,
-    shared: ptr B, args: C, compute: ComputeProc[A, B, C]) {.nimcall, gcsafe.} =
+    shared: ptr B, args: C, compute: ComputeProc[A, B, C]) {.gcsafe.} =
   compute(env, barrier, buffers, shared, args)
 
 proc workGroupProc[A, B, C](
@@ -109,7 +109,7 @@ proc workGroupProc[A, B, C](
   # Auxiliary proc for work group management
   var env = env # Shadow for modification
   env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
-  var smem = smem #
+  var smem = smem # Allocated per work group
 
   var barrier = createBarrier(
     env.gl_WorkGroupSize.x * env.gl_WorkGroupSize.y * env.gl_WorkGroupSize.z)
