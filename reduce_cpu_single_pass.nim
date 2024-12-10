@@ -81,10 +81,10 @@ proc main =
     globalCount: default(Atomic[uint])
   )
 
-  buffers.status[0].store(1)
+  buffers.status[0].store(1) # Set first group as ready
 
   # Run the compute shader on CPU, pass buffers as parameters.
-  runComputeOnCpu[ptr[Buffers], Shared, Args](
+  runComputeOnCpu(
     numWorkGroups, workGroupSize, addr buffers,
     Shared(buffer: newSeq[int32](workGroupSize.x), localCount: 0),
     reductionShader,
