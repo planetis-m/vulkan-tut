@@ -2,7 +2,7 @@
 # `-d:danger --opt:none --panics:on --threads:on --tlsEmulation:off --mm:arc -d:useMalloc -g`
 # ...and debug with nim-gdb or lldb
 
-import emulate_device_exp, std/[atomics, math], malebolgia
+import emulate_device_pro, std/[atomics, math], malebolgia
 
 type
   Buffers = object

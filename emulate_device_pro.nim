@@ -129,7 +129,6 @@ proc workGroupProc[A, B, C](
   var env = env # Shadow for modification
   env.gl_WorkGroupID = uvec3(wgX, wgY, wgZ)
   var smem = smem[] # Allocated per work group
-
   var barrier = createBarrier(
     env.gl_WorkGroupSize.x * env.gl_WorkGroupSize.y * env.gl_WorkGroupSize.z)
   # Create master for managing threads

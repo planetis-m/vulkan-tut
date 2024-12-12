@@ -4,7 +4,7 @@
 # https://www.youtube.com/watch?v=CcwdWP44aFE
 # Compile with at least `-d:ThreadPoolSize=workgroupSize+1`
 
-import emulate_device_exp, std/math, malebolgia
+import emulate_device_pro, std/math, malebolgia
 
 type
   Args = tuple
@@ -13,7 +13,7 @@ type
 proc prefixSumShaderDoubleBuffered(
     env: GlEnvironment, barrier: BarrierHandle,
     b: ptr tuple[input, output, partialSums: seq[int32]],
-    smem: ptr tuple[sharedA, sharedB: seq[int32]], args: Args) {.gcsafe.} =
+    smem: ptr tuple[sharedA, sharedB: seq[int32]], args: Args) =
   let (n, isExclusive) = args
   let globalIdx = env.gl_GlobalInvocationID.x
   let localIdx = env.gl_LocalInvocationID.x
@@ -101,7 +101,7 @@ proc main =
     partialSums: newSeq[int32](numWorkGroups.x) # gridSize
   )
 
-  # Run the compute shader on CPU, pass buffers and normals as parameters.
+  # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, prefixSumShaderDoubleBuffered,
     addr buffers, (newSeq[int32](workGroupSize.x), newSeq[int32](workGroupSize.x)),
     (numElements, isExclusive))

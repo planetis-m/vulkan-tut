@@ -3,7 +3,7 @@
 # https://github.com/cwpearson/nvidia-performance-tools
 # https://siboehm.com/articles/22/CUDA-MMM
 
-import emulate_device_exp, malebolgia, std/[math, strutils]
+import emulate_device, malebolgia, std/[math, strutils]
 
 type
   Args = tuple
@@ -13,7 +13,7 @@ type
 
 proc multiplyShader(env: GlEnvironment; barrier: BarrierHandle;
                     b: ptr tuple[A, B, C: seq[float32]];
-                    sharedB: ptr seq[float32]; args: Args) {.gcsafe.} =
+                    sharedB: ptr seq[float32]; args: Args) =
   let (M, K, N, tileSizeA, tileSizeB, tileSizeRatio) = args
   let row = env.gl_WorkGroupID.x * env.gl_WorkGroupSize.x + env.gl_LocalInvocationID.x
   let col = env.gl_WorkGroupID.y * tileSizeB
