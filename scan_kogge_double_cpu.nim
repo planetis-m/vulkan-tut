@@ -102,8 +102,7 @@ proc main =
   )
 
   # Run the compute shader on CPU, pass buffers and normals as parameters.
-  runComputeOnCpu(
-    numWorkGroups, workGroupSize, prefixSumShaderDoubleBuffered,
+  runComputeOnCpu(numWorkGroups, workGroupSize, prefixSumShaderDoubleBuffered,
     addr buffers, (newSeq[int32](workGroupSize.x), newSeq[int32](workGroupSize.x)),
     (numElements, isExclusive))
 

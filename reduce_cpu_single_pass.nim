@@ -85,8 +85,7 @@ proc main =
   # Run the compute shader on CPU, pass buffers as parameters.
   runComputeOnCpu(numWorkGroups, workGroupSize, reductionShader,
     addr buffers, Shared(buffer: newSeq[int32](workGroupSize.x), localCount: 0),
-    (numElements, coarseFactor)
-  )
+    (numElements, coarseFactor))
 
   let result = buffers.output[^1]
   let expected = (numElements - 1)*numElements div 2

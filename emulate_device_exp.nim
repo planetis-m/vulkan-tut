@@ -163,7 +163,7 @@ proc runComputeOnCpu*[A, B, C](
   for batch in 0 ..< numBatches:
     let endGroup = min(currentGroup + MaxConcurrentWorkGroups, totalGroups.int)
     # Create master for managing work groups
-    var master = createMaster(activeProducer = false)
+    var master = createMaster(activeProducer = false) # not synchronized
     master.awaitAll:
       while currentGroup < endGroup:
         master.spawn workGroupProc(wgX, wgY, wgZ, env, compute, ssbo, addr smem, args)
