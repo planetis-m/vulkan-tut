@@ -51,14 +51,12 @@ proc reductionShader(env: GlEnvironment, barrier: BarrierHandle,
     if localIdx == 0:
       let ticket = fetchAdd(b.retirementCount, 1)
       smem.isLastWorkGroup = uint(ticket == gridSize - 1)
-    wait barrier # was groupMemoryBarrier(); barrier();
+    wait barrier # was memoryBarrierShared(); barrier();
     # The last block sums the results of all other blocks
     if smem.isLastWorkGroup != 0:
-      var i = localIdx
       var sum: int32 = 0
-      while i < gridSize:
+      for i in countup(localIdx, gridSize, localSize):
         sum += b.output[i]
-        i += localSize
       smem.buffer[localIdx] = sum
 
       wait barrier
