@@ -74,8 +74,8 @@ proc main =
   var buffers = (A: ensureMove A, B: ensureMove B, C: newSeq[float32](M * N))
 
   # Run the compute shader on CPU, pass buffers and dimensions as parameters.
-  runComputeOnCpu(numWorkGroups, workGroupSize, sgemmShader,
-    addr buffers, (newSeq[float32](localSize * localSize), newSeq[float32](localSize * localSize)),
+  runComputeOnCpu(numWorkGroups, workGroupSize, sgemmShader, addr buffers,
+    (newSeq[float32](localSize * localSize), newSeq[float32](localSize * localSize)),
     (alpha, beta, true, false, M, K, N, localSize))
 
   # Verify the result
